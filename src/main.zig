@@ -9,5 +9,5 @@ pub fn main() !void {
 }
 
 test "bandersnatch" {
-    _ = @import("ecc/bandersnatch/fieldbase.zig");
+    _ = @import("ecc/bandersnatch/fieldapi.zig");
 }
