@@ -8,6 +8,6 @@ pub fn main() !void {
     std.debug.print("{}", .{@divTrunc(a, b)});
 }
 
-test "bandersnatch" {
-    _ = @import("ecc/bandersnatch/fieldapi.zig");
+test "ecc/bandersnatch" {
+    _ = @import("ecc/bandersnatch/bandersnatch.zig");
 }
