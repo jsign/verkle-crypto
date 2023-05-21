@@ -12,8 +12,9 @@ fn BandersnatchField(comptime fieldType: type, comptime mod: u256) type {
     }
 
     return struct {
+        pub const MODULO = mod;
+
         const Self = @This();
-        const MODULO = mod;
         const Q_MIN_ONE_DIV_2 = (MODULO - 1) / 2;
         const baseZero = val: {
             var bz: gen_fp.MontgomeryDomainFieldElement = undefined;
@@ -23,7 +24,7 @@ fn BandersnatchField(comptime fieldType: type, comptime mod: u256) type {
 
         fe: fieldType,
 
-        fn fromInteger(num: u256) Self {
+        pub fn fromInteger(num: u256) Self {
             var lbe: [BYTE_LEN]u8 = [_]u8{0} ** BYTE_LEN;
             std.mem.writeInt(u256, lbe[0..], num % MODULO, std.builtin.Endian.Little);
 
@@ -38,6 +39,7 @@ fn BandersnatchField(comptime fieldType: type, comptime mod: u256) type {
         pub fn zero() Self {
             return baseZero;
         }
+
         pub fn one() Self {
             return comptime {
                 var baseOne: gen_fp.MontgomeryDomainFieldElement = undefined;
@@ -160,7 +162,7 @@ fn BandersnatchField(comptime fieldType: type, comptime mod: u256) type {
             return std.mem.eql(u64, &self.fe, &other.fe);
         }
 
-        fn toInteger(self: Self) u256 {
+        pub fn toInteger(self: Self) u256 {
             var nonMont: gen_fp.NonMontgomeryDomainFieldElement = undefined;
             gen_fp.fromMontgomery(&nonMont, self.fe);
 
