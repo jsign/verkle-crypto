@@ -1,13 +1,6 @@
-const BandersnatchField = @import("fieldapi.zig");
-const Fp = BandersnatchField.Fp;
-const Fr = BandersnatchField.Fr;
-
-const A = Fp.fromInteger(Fp.MODULO - 5);
-const D = Fp.fromInteger(138827208126141220649022263972958607803).Div(Fp.fromInteger(171449701953573178309673572579671231137));
-
-pub const CurveError = error{
-    NotInCurve,
-};
+const Bandersnatch = @import("bandersnatch.zig");
+const Fp = Bandersnatch.Fp;
+const Fr = Bandersnatch.Fr;
 
 const AffinePoint = struct {
     x: Fp,
@@ -50,10 +43,10 @@ const AffinePoint = struct {
         const x1y2 = x1 * y2;
 
         const y1x2 = y1 * x2;
-        const ax1x2 = x1 * x2 * A;
+        const ax1x2 = x1 * x2 * Bandersnatch.A;
         const y1y2 = y1 * y2;
 
-        const dx1x2y1y2 = x1y2 * y1x2 * D;
+        const dx1x2y1y2 = x1y2 * y1x2 * Bandersnatch.D;
 
         const x_num = x1y2 + y1x2;
 
@@ -122,8 +115,8 @@ const AffinePoint = struct {
         const x_sq = self.x.mul(self.x);
         const y_sq = self.y.mul(self.y);
 
-        const dxy_sq = x_sq.mul(y_sq).mul(D);
-        const a_x_sq = A.mul(x_sq);
+        const dxy_sq = x_sq.mul(y_sq).mul(Bandersnatch.D);
+        const a_x_sq = Bandersnatch.A.mul(x_sq);
 
         const one = Fp.one();
 
@@ -137,9 +130,9 @@ const AffinePoint = struct {
         const one = Fp.one();
 
         const num = x.mul(x);
-        const den = num.mul(D).sub(one);
+        const den = num.mul(Bandersnatch.D).sub(one);
 
-        const num2 = num.mul(A).sub(one);
+        const num2 = num.mul(Bandersnatch.A).sub(one);
 
         // This can only be None if the denominator is zero
         const y = num2.div(den) orelse return null; // y^2
