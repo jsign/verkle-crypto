@@ -2,7 +2,7 @@ const Bandersnatch = @import("bandersnatch.zig");
 const Fp = Bandersnatch.Fp;
 const Fr = Bandersnatch.Fr;
 
-const AffinePoint = struct {
+pub const AffinePoint = struct {
     x: Fp,
     y: Fp,
 
@@ -22,9 +22,9 @@ const AffinePoint = struct {
     pub fn generator() AffinePoint {
         // Generator point was taken from the bandersnatch paper: https://ia.cr/2021/1152
         return comptime {
-            const yTe = Fp(0x2a6c669eda123e0f157d8b50badcd586358cad81eee464605e3167b6cc974166);
-            const xTe = Fp(0x29c132cc2c0b34c5743711777bbe42f32b79c022ad998465e1e71866a252ae18);
-            return init(xTe, yTe);
+            const yTe = Fp.fromInteger(0x2a6c669eda123e0f157d8b50badcd586358cad81eee464605e3167b6cc974166);
+            const xTe = Fp.fromInteger(0x29c132cc2c0b34c5743711777bbe42f32b79c022ad998465e1e71866a252ae18);
+            return try init(xTe, yTe);
         };
     }
 
@@ -99,9 +99,9 @@ const AffinePoint = struct {
         const mCompressedNegative = 0x80;
         const mCompressedPositive = 0x00;
 
-        const x_bytes = self.x.toBytes();
+        var x_bytes = self.x.toBytes();
 
-        const mask = mCompressedPositive;
+        var mask: u8 = mCompressedPositive;
         if (self.y.lexographically_largest()) {
             mask = mCompressedNegative;
         }

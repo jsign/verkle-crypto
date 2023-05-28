@@ -109,6 +109,10 @@ fn BandersnatchField(comptime fieldType: type, comptime mod: u256) type {
             return self.eq(baseZero);
         }
 
+        pub fn isOne(self: Self) bool {
+            return self.eq(one());
+        }
+
         // TODO: this is naive, do something better.
         pub fn pow(self: Self, exponent: u256) Self {
             var res: Self = self;
@@ -125,9 +129,6 @@ fn BandersnatchField(comptime fieldType: type, comptime mod: u256) type {
             var t_old: i512 = 0;
 
             var r_new: i512 = self.toInteger();
-            if (r_new != 1) {
-                std.debug.print("r_new is not 1: {}\n", .{r_new});
-            }
             var t_new: i512 = 1;
 
             while (r_new != 0) {
