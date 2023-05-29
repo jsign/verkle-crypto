@@ -125,33 +125,33 @@ fn BandersnatchField(comptime fieldType: type, comptime mod: u256) type {
         }
 
         pub fn inv(self: Self) ?Self {
-            var r_old: i512 = MODULO;
-            var t_old: i512 = 0;
+            var r: u256 = MODULO;
+            var t: i768 = 0;
 
-            var r_new: i512 = self.toInteger();
-            var t_new: i512 = 1;
+            var newr: u256 = self.toInteger();
+            var newt: i768 = 1;
 
-            while (r_new != 0) {
-                const q = @divTrunc(r_old, r_new);
-                const s = t_old - q * t_new;
-                const r = @mod(r_old, r_new);
+            while (newr != 0) {
+                const quotient = r / newr;
+                const tempt = t - quotient * newt;
+                const tempr = @mod(r, newr);
 
-                r_old = r_new;
-                t_old = t_new;
-                r_new = r;
-                t_new = s;
+                r = newr;
+                t = newt;
+                newr = tempr;
+                newt = tempt;
             }
 
             // Not invertible
-            if (r_old > 1) {
+            if (r > 1) {
                 return null;
             }
 
-            if (t_old < 0) {
-                return Self.fromInteger(@intCast(u256, t_old) + MODULO);
+            if (t < 0) {
+                return Self.fromInteger(@intCast(u256, t + MODULO));
             }
 
-            return Self.fromInteger(@intCast(u256, t_old));
+            return Self.fromInteger(@intCast(u256, t));
         }
 
         pub fn div(self: Self, den: Self) ?Self {
@@ -226,15 +226,12 @@ test "add sub mul neg" {
     try std.testing.expect(gotneg.eq(wantneg));
 }
 
-// TODO: uncomment this when Zig bug is fixed.
-// test "inv" {
-//     try std.testing.expect(Fp.fromInteger(0).inv() == null);
+test "inv" {
+    try std.testing.expect(Fp.fromInteger(0).inv() == null);
 
-//     const one = Fp.one();
-//     const cases = [_]Fp{Fp.fromInteger(1)}; //, Fp.fromInteger(Q_MIN_ONE_DIV_2), Fp.fromInteger(MODULO - 1) };
-//     for (cases) |fe| {
-//         try std.testing.expect(fe.mul(fe.inv().?).eq(one));
-//     }
-// }
-//
-//test "div" {}
+    const one = Fp.one();
+    const cases = [_]Fp{ Fp.fromInteger(1), Fp.fromInteger(42), Fp.fromInteger(Fp.MODULO - 1) };
+    for (cases) |fe| {
+        try std.testing.expect(fe.mul(fe.inv().?).eq(one));
+    }
+}
