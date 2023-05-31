@@ -49,9 +49,21 @@ fn BandersnatchField(comptime fieldType: type, comptime mod: u256) type {
         }
 
         pub fn fromBytes(bytes: [BYTE_LEN]u8) Self {
+            var dret: gen_fp.NonMontgomeryDomainFieldElement = undefined;
+            gen_fp.fromBytes(&dret, bytes);
+
             var ret: gen_fp.MontgomeryDomainFieldElement = undefined;
-            gen_fp.fromBytes(&ret, bytes);
+            gen_fp.toMontgomery(&ret, dret);
             return Self{ .fe = ret };
+        }
+
+        pub fn toBytes(self: Self) [BYTE_LEN]u8 {
+            var nonMont: gen_fp.NonMontgomeryDomainFieldElement = undefined;
+            gen_fp.fromMontgomery(&nonMont, self.fe);
+
+            var ret: [BYTE_LEN]u8 = undefined;
+            gen_fp.toBytes(&ret, nonMont);
+            return ret;
         }
 
         // TODO
@@ -59,18 +71,19 @@ fn BandersnatchField(comptime fieldType: type, comptime mod: u256) type {
         //     def from_bytes_reduce(bytes):
         //         return Fp(None, Field.from_bytes_reduce(bytes, BASE_FIELD))
 
-        pub fn toBytes(self: Self) [BYTE_LEN]u8 {
-            var ret: [BYTE_LEN]u8 = undefined;
-            gen_fp.toBytes(&ret, self.fe);
-            return ret;
-        }
-
         pub fn lexographically_largest(self: Self) bool {
-            const qminusonediv2 = comptime fromInteger(Q_MIN_ONE_DIV_2);
-            for (self.fe, 0..) |elem, i| {
-                if (elem > qminusonediv2.fe[i]) return true;
+            const selfNonMont = self.fromMontgomery();
+            const qminusonediv2 = comptime fromInteger(Q_MIN_ONE_DIV_2).fromMontgomery();
+            inline for (selfNonMont, 0..) |elem, i| {
+                if (elem > qminusonediv2[i]) return true;
             }
             return false;
+        }
+
+        pub fn fromMontgomery(self: Self) gen_fp.NonMontgomeryDomainFieldElement {
+            var nonMont: gen_fp.NonMontgomeryDomainFieldElement = undefined;
+            gen_fp.fromMontgomery(&nonMont, self.fe);
+            return nonMont;
         }
 
         // TODO
@@ -113,7 +126,7 @@ fn BandersnatchField(comptime fieldType: type, comptime mod: u256) type {
             return self.eq(one());
         }
 
-        // TODO: this is naive, do something better.
+        // TODO(improv): this is naive, do something better.
         pub fn pow(self: Self, exponent: u256) Self {
             var res: Self = self;
             var exp = exponent;
@@ -172,6 +185,96 @@ fn BandersnatchField(comptime fieldType: type, comptime mod: u256) type {
 
             return std.mem.readInt(u256, &bytes, std.builtin.Endian.Little);
         }
+
+        // TODO
+        // def modular_sqrt(a, p):
+        //     """ Find a quadratic residue (mod p) of 'a'. p
+        //         must be an odd prime.
+        //         Solve the congruence of the form:
+        //             x^2 = a (mod p)
+        //         And returns x. Note that p - x is also a root.
+        //         0 is returned is no square root exists for
+        //         these a and p.
+        //         The Tonelli-Shanks algorithm is used (except
+        //         for some simple cases in which the solution
+        //         is known from an identity). This algorithm
+        //         runs in polynomial time (unless the
+        //         generalized Riemann hypothesis is false).
+        //     """
+        //     # Simple cases
+        //     #
+        //     if legendre_symbol(a, p) != 1:
+        //         return None
+        //     elif a == 0:
+        //         return 0
+        //     elif p == 2:
+        //         return 0
+        //     elif p % 4 == 3:
+        //         return pow(a, (p + 1) // 4, p)
+
+        //     # Partition p-1 to s * 2^e for an odd s (i.e.
+        //     # reduce all the powers of 2 from p-1)
+        //     #
+        //     s = p - 1
+        //     e = 0
+        //     while s % 2 == 0:
+        //         s //= 2
+        //         e += 1
+
+        //     # Find some 'n' with a legendre symbol n|p = -1.
+        //     # Shouldn't take long.
+        //     #
+        //     n = 2
+        //     while legendre_symbol(n, p) != -1:
+        //         n += 1
+
+        //     # Here be dragons!
+        //     # Read the paper "Square roots from 1; 24, 51,
+        //     # 10 to Dan Shanks" by Ezra Brown for more
+        //     # information
+        //     #
+
+        //     # x is a guess of the square root that gets better
+        //     # with each iteration.
+        //     # b is the "fudge factor" - by how much we're off
+        //     # with the guess. The invariant x^2 = ab (mod p)
+        //     # is maintained throughout the loop.
+        //     # g is used for successive powers of n to update
+        //     # both a and b
+        //     # r is the exponent - decreases with each update
+        //     #
+        //     x = pow(a, (s + 1) // 2, p)
+        //     b = pow(a, s, p)
+        //     g = pow(n, s, p)
+        //     r = e
+
+        //     while True:
+        //         t = b
+        //         m = 0
+        //         for m in range(r):
+        //             if t == 1:
+        //                 break
+        //             t = pow(t, 2, p)
+
+        //         if m == 0:
+        //             return x
+
+        //         gs = pow(g, 2 ** (r - m - 1), p)
+        //         g = (gs * gs) % p
+        //         x = (x * gs) % p
+        //         b = (b * g) % p
+        //         r = m
+
+        // def legendre_symbol(a, p):
+        //     """ Compute the Legendre symbol a|p using
+        //         Euler's criterion. p is a prime, a is
+        //         relatively prime to p (if p divides
+        //         a, then a|p = 0)
+        //         Returns 1 if a has a square root modulo
+        //         p, -1 otherwise.
+        //     """
+        //     ls = pow(a, (p - 1) // 2, p)
+        //     return -1 if ls == p - 1 else ls
     };
 }
 
