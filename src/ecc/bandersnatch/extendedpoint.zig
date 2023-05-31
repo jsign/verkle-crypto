@@ -111,24 +111,23 @@ pub const ExtendedPoint = struct {
     }
 
     pub fn double(self: ExtendedPoint) ExtendedPoint {
-        // TODO: can replace this with dedicated doubling formula
+        // TODO(improv): can replace this with dedicated doubling formula
         return add(self, self);
     }
 
-    pub fn scalarMul(point: ExtendedPoint, scalar: Fr) ExtendedPoint {
+    pub fn scalarMul(point: ExtendedPoint, scalarMont: Fr) ExtendedPoint {
         // Same as AffinePoint's equivalent method
         // using double and add : https://en.wikipedia.org/wiki/Elliptic_curve_point_multiplication#Double-and-add
         var result = identity();
         var temp = point;
 
-        const one: @TypeOf(scalar.fe[0]) = 1;
-        for (scalar.fe) |limb| {
-            for (0..@bitSizeOf(@TypeOf(scalar.fe[0]))) |i| {
-                if (scalar.fe[limb] & (one << @intCast(u6, i)) == 1) {
-                    result = result.add(temp);
-                }
-                temp = temp.double();
+        const scalar = scalarMont.toInteger();
+        const one: @TypeOf(scalar) = 1;
+        inline for (0..@bitSizeOf(@TypeOf(scalar))) |i| {
+            if (scalar & (one << @intCast(u8, i)) > 0) {
+                result = result.add(temp);
             }
+            temp = temp.double();
         }
         return result;
     }
