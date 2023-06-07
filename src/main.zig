@@ -1,13 +1,9 @@
 const std = @import("std");
-const testing = std.testing;
+const bander = @import("ecc/bandersnatch/bandersnatch.zig");
 
-// Lines 7-8 prints in two different ways
-pub fn main() !void {
-    var a: i512 = 10;
-    var b: i512 = 2;
-    std.debug.print("{}", .{@divTrunc(a, b)});
-}
+pub fn main() !void {}
 
-test "ecc/bandersnatch" {
+test "bandersnatch" {
     _ = @import("ecc/bandersnatch/bandersnatch.zig");
+    std.testing.refAllDeclsRecursive(@This());
 }
