@@ -125,7 +125,7 @@ pub const AffinePoint = struct {
         return lhs.eq(rhs);
     }
 
-    pub fn get_y_coordinate(x: Fp, returnPositiveY: bool) ?Fp {
+    pub fn getYCoordinate(x: Fp, returnPositiveY: bool) ?Fp {
         const one = Fp.one();
 
         const num = x.mul(x);
