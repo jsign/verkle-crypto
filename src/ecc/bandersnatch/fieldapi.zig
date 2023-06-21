@@ -265,16 +265,20 @@ fn BandersnatchField(comptime fieldType: type, comptime mod: u256) type {
         //         b = (b * g) % p
         //         r = m
 
-        // def legendre_symbol(a, p):
-        //     """ Compute the Legendre symbol a|p using
-        //         Euler's criterion. p is a prime, a is
-        //         relatively prime to p (if p divides
-        //         a, then a|p = 0)
-        //         Returns 1 if a has a square root modulo
-        //         p, -1 otherwise.
-        //     """
-        //     ls = pow(a, (p - 1) // 2, p)
-        //     return -1 if ls == p - 1 else ls
+        pub fn legendre(a: Self) i2 {
+            // Compute the Legendre symbol a|p using
+            // Euler's criterion. p is a prime, a is
+            // relatively prime to p (if p divides
+            // a, then a|p = 0)
+            // Returns 1 if a has a square root modulo
+            // p, -1 otherwise.
+            const ls = a.pow((MODULO - 1) / 2);
+
+            if (ls == MODULO - 1) {
+                return -1;
+            }
+            return ls;
+        }
     };
 }
 
