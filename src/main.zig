@@ -7,3 +7,8 @@ test "bandersnatch" {
     _ = @import("ecc/bandersnatch/bandersnatch.zig");
     std.testing.refAllDeclsRecursive(@This());
 }
+
+test "polynomial" {
+    _ = @import("polynomial/monomial_basis.zig");
+    std.testing.refAllDeclsRecursive(@This());
+}

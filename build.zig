@@ -10,7 +10,7 @@ pub fn build(b: *std.Build) void {
         .target = target,
         .optimize = optimize,
     });
-    lib.install();
+    b.installArtifact(lib);
 
     // _ = b.createModule(.{
     //     .source_file = .{ .path = "ecc/bandersnatch/bandersnatch.zig" },
@@ -22,5 +22,5 @@ pub fn build(b: *std.Build) void {
         .optimize = optimize,
     });
     const test_step = b.step("test", "Run library tests");
-    test_step.dependOn(&main_tests.run().step);
+    test_step.dependOn(&b.addRunArtifact(main_tests).step);
 }

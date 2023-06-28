@@ -24,7 +24,7 @@ pub const AffinePoint = struct {
         return comptime {
             const xTe = Fp.fromInteger(0x29c132cc2c0b34c5743711777bbe42f32b79c022ad998465e1e71866a252ae18);
             const yTe = Fp.fromInteger(0x2a6c669eda123e0f157d8b50badcd586358cad81eee464605e3167b6cc974166);
-            return try init(xTe, yTe);
+            return init(xTe, yTe) catch unreachable;
         };
     }
 
