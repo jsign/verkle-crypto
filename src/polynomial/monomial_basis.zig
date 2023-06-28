@@ -38,20 +38,29 @@ pub const MonomialBasis = struct {
         std.debug.assert(a.coeffs.items.len >= b.coeffs.items.len);
 
         const az = try a.coeffs.clone();
+        defer az.deinit();
         var o = ArrayList(Fr).init(allocator);
         var apos = a.coeffs.items.len - 1;
         var bpos = b.coeffs.items.len - 1;
         var diff = apos - bpos;
 
-        while (diff >= 0) {
+        diffloop: while (diff >= 0) {
             const quot = Fr.div(az.items[apos], b.coeffs.items[bpos]).?;
             try o.insert(0, quot);
 
             var i = bpos;
-            while (i >= 0) : (i -= 1) {
+            blk: while (i >= 0) {
                 az.items[diff + i] = Fr.sub(az.items[diff + i], Fr.mul(b.coeffs.items[i], quot));
+                if (i == 0) {
+                    break :blk;
+                }
+                i -= 1;
             }
             apos -= 1;
+
+            if (diff == 0) {
+                break :diffloop;
+            }
             diff -= 1;
         }
 
@@ -118,21 +127,22 @@ test "Vanishing Polynomial on domain" {
 }
 
 test "Polynomial Division" {
-    //         # a = (x+1)(x+2) = x^2 + 3x + 2
+    // a = (x+1)(x+2) = x^2 + 3x + 2
     var acoeff = ArrayList(Fr).init(allocator_test);
     defer acoeff.deinit();
     try acoeff.appendSlice(&[_]Fr{ Fr.fromInteger(2), Fr.fromInteger(3), Fr.fromInteger(1) });
     const a = MonomialBasis{ .coeffs = acoeff };
 
-    //         # b = (x+1)
+    // b = (x+1)
     var bcoeff = ArrayList(Fr).init(allocator_test);
     defer bcoeff.deinit();
     try bcoeff.appendSlice(&[_]Fr{ Fr.fromInteger(1), Fr.fromInteger(1) });
     const b = MonomialBasis{ .coeffs = bcoeff };
 
-    const result = try MonomialBasis.div(allocator_test, a, b);
+    var result = try MonomialBasis.div(allocator_test, a, b);
+    defer result.deinit();
 
-    //         # Expected result should be (x+2)
+    // Expected result should be (x+2)
     var expcoeff = ArrayList(Fr).init(allocator_test);
     defer expcoeff.deinit();
     try expcoeff.appendSlice(&[_]Fr{ Fr.fromInteger(2), Fr.fromInteger(1) });
