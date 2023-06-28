@@ -41,11 +41,12 @@ fn BandersnatchField(comptime fieldType: type, comptime mod: u256) type {
         }
 
         pub fn one() Self {
-            return comptime {
+            const oneValue = comptime blk: {
                 var baseOne: gen_fp.MontgomeryDomainFieldElement = undefined;
                 gen_fp.setOne(&baseOne);
-                return Self{ .fe = baseOne };
+                break :blk Self{ .fe = baseOne };
             };
+            return oneValue;
         }
 
         pub fn fromBytes(bytes: [BYTE_LEN]u8) Self {
