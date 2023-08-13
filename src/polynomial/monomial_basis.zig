@@ -19,6 +19,14 @@ pub const MonomialBasis = struct {
         return .{ .coeffs = ArrayList(Fr).init(allocator) };
     }
 
+    pub fn fromCoeffs(gpa: std.mem.Allocator, coeffs: []const u256) !MonomialBasis {
+        var cfs = try ArrayList(Fr).initCapacity(gpa, coeffs.len);
+        for (coeffs) |c| {
+            try cfs.append(Fr.fromInteger(c));
+        }
+        return .{ .coeffs = cfs };
+    }
+
     pub fn deinit(self: *MonomialBasis) void {
         self.coeffs.deinit();
     }
@@ -128,41 +136,31 @@ test "Vanishing Polynomial on domain" {
 
 test "Polynomial Division" {
     // a = (x+1)(x+2) = x^2 + 3x + 2
-    var acoeff = ArrayList(Fr).init(allocator_test);
-    defer acoeff.deinit();
-    try acoeff.appendSlice(&[_]Fr{ Fr.fromInteger(2), Fr.fromInteger(3), Fr.fromInteger(1) });
-    const a = MonomialBasis{ .coeffs = acoeff };
+    var a = try MonomialBasis.fromCoeffs(allocator_test, &[_]u256{ 2, 3, 1 });
+    defer a.deinit();
 
     // b = (x+1)
-    var bcoeff = ArrayList(Fr).init(allocator_test);
-    defer bcoeff.deinit();
-    try bcoeff.appendSlice(&[_]Fr{ Fr.fromInteger(1), Fr.fromInteger(1) });
-    const b = MonomialBasis{ .coeffs = bcoeff };
+    var b = try MonomialBasis.fromCoeffs(allocator_test, &[_]u256{ 1, 1 });
+    defer b.deinit();
 
     var result = try MonomialBasis.div(allocator_test, a, b);
     defer result.deinit();
 
     // Expected result should be (x+2)
-    var expcoeff = ArrayList(Fr).init(allocator_test);
-    defer expcoeff.deinit();
-    try expcoeff.appendSlice(&[_]Fr{ Fr.fromInteger(2), Fr.fromInteger(1) });
-    var expected = MonomialBasis{ .coeffs = expcoeff };
+    var expected = try MonomialBasis.fromCoeffs(allocator_test, &[_]u256{ 2, 1 });
+    defer expected.deinit();
 
     try std.testing.expect(expected.eq(result));
 }
 
 test "Derivative" {
     // a = 6x^4 + 5x^3 + 10x^2 + 20x + 9
-    var acoeff = ArrayList(Fr).init(allocator_test);
-    defer acoeff.deinit();
-    try acoeff.appendSlice(&[_]Fr{ Fr.fromInteger(9), Fr.fromInteger(20), Fr.fromInteger(10), Fr.fromInteger(5), Fr.fromInteger(6) });
-    const a = MonomialBasis{ .coeffs = acoeff };
+    var a = try MonomialBasis.fromCoeffs(allocator_test, &[_]u256{ 9, 20, 10, 5, 6 });
+    defer a.deinit();
 
     // the derivative of a is 24x^3 + 15x^2 + 20x + 20
-    var expcoeff = ArrayList(Fr).init(allocator_test);
-    defer expcoeff.deinit();
-    try expcoeff.appendSlice(&[_]Fr{ Fr.fromInteger(20), Fr.fromInteger(20), Fr.fromInteger(15), Fr.fromInteger(24) });
-    const expected_a_prime = MonomialBasis{ .coeffs = expcoeff };
+    var expected_a_prime = try MonomialBasis.fromCoeffs(allocator_test, &[_]u256{ 20, 20, 15, 24 });
+    defer expected_a_prime.deinit();
 
     var got_a_prime = try MonomialBasis.formalDerivative(allocator_test, a);
     defer got_a_prime.deinit();
