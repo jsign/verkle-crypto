@@ -78,12 +78,12 @@ pub const MonomialBasis = struct {
         return y;
     }
 
-    pub fn formalDerivative(self: *MonomialBasis, f: MonomialBasis) *MonomialBasis {
-        self.coeffs.clearRetainingCapacity();
-        for (f.coeffs.items, 1..) |c, n| {
-            self.coeffs.append(c * Fr(n));
+    pub fn formalDerivative(allocator: std.mem.Allocator, f: MonomialBasis) !MonomialBasis {
+        var coeffs = try ArrayList(Fr).initCapacity(allocator, f.coeffs.items.len - 1);
+        for (f.coeffs.items[1..], 1..) |c, n| {
+            try coeffs.append(c.mul(Fr.fromInteger(n)));
         }
-        return self;
+        return .{ .coeffs = coeffs };
     }
 
     pub fn vanishingPoly(allocator: std.mem.Allocator, xs: ArrayList(Fr)) !MonomialBasis {
@@ -151,15 +151,21 @@ test "Polynomial Division" {
     try std.testing.expect(expected.eq(result));
 }
 
-// test "Derivative" {
-//         # a = 6x^4 + 5x^3 + 10x^2 + 20x + 9
-//         a = Polynomial([Fr(9), Fr(20), Fr(10), Fr(5), Fr(6)])
-//         # the derivative of a is 24x^3 + 15x^2 + 20x + 20
-//         expected_a_prime = Polynomial([Fr(20), Fr(20), Fr(15), Fr(24)])
+test "Derivative" {
+    // a = 6x^4 + 5x^3 + 10x^2 + 20x + 9
+    var acoeff = ArrayList(Fr).init(allocator_test);
+    defer acoeff.deinit();
+    try acoeff.appendSlice(&[_]Fr{ Fr.fromInteger(9), Fr.fromInteger(20), Fr.fromInteger(10), Fr.fromInteger(5), Fr.fromInteger(6) });
+    const a = MonomialBasis{ .coeffs = acoeff };
 
-//         got_a_prime = Polynomial._empty()
-//         got_a_prime.formal_derivative(a)
+    // the derivative of a is 24x^3 + 15x^2 + 20x + 20
+    var expcoeff = ArrayList(Fr).init(allocator_test);
+    defer expcoeff.deinit();
+    try expcoeff.appendSlice(&[_]Fr{ Fr.fromInteger(20), Fr.fromInteger(20), Fr.fromInteger(15), Fr.fromInteger(24) });
+    const expected_a_prime = MonomialBasis{ .coeffs = expcoeff };
 
-//         self.assertEqual(got_a_prime, expected_a_prime)
-// }
+    var got_a_prime = try MonomialBasis.formalDerivative(allocator_test, a);
+    defer got_a_prime.deinit();
 
+    try std.testing.expect(expected_a_prime.eq(got_a_prime));
+}
