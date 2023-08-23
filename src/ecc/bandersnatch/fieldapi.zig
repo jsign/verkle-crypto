@@ -1,4 +1,5 @@
 const std = @import("std");
+const ArrayList = std.ArrayList;
 const gen_fp = @import("gen_fp.zig");
 const gen_fr = @import("gen_fr.zig");
 
@@ -87,13 +88,15 @@ fn BandersnatchField(comptime fieldType: type, comptime mod: u256) type {
             return nonMont;
         }
 
-        // TODO
-        //     def multi_inv(values):
-        //         result = []
-        //         inverses = Field.multi_inv(values)
-        //         for inv in inverses:
-        //         result.append(Fp(None, inv))
-        //         return result
+        // TODO(jsign): optimize.
+        pub fn multiInv(gpa: std.mem.Allocator, values: []Self) !ArrayList(Self) {
+            var ret = try ArrayList(Self).initCapacity(gpa, values.len);
+            for (values) |v| {
+                const vi = v.inv() orelse return error.InverseDoesntExist;
+                ret.appendAssumeCapacity(vi);
+            }
+            return ret;
+        }
 
         pub fn add(self: Self, other: Self) Self {
             var ret: gen_fp.MontgomeryDomainFieldElement = undefined;
