@@ -32,37 +32,42 @@ pub const LagrangeBasis = struct {
         return try self.evaluations;
     }
 
-    pub fn add(self: *LagrangeBasis, lhs: *LagrangeBasis, rhs: *LagrangeBasis) !void {
+    pub fn add(self: *LagrangeBasis, lhs: *const LagrangeBasis, rhs: *const LagrangeBasis) !void {
         if (lhs.evaluations.items.len != rhs.evaluations.items.len) {
             return OperationError.LengthMismatch;
         }
-        self.evaluations = try ArrayList(Fr).initCapacity(lhs.evaluations.len);
-        for (lhs.evaluations.items, 0..) |lhs_i, i| {
-            self.evaluations.appendAssumeCapacity(lhs_i + rhs.evaluations.items[i]);
+        try self.evaluations.resize(lhs.evaluations.items.len);
+        for (0..lhs.evaluations.items.len) |i| {
+            self.evaluations.items[i] = lhs.evaluations.items[i].add(rhs.evaluations.items[i]);
         }
-        self.domain = try lhs.domain.clone();
+        try self.domain.resize(lhs.evaluations.items.len);
+        std.mem.copy(Fr, self.domain.items, lhs.domain.items);
     }
 
-    pub fn sub(self: *LagrangeBasis, lhs: *LagrangeBasis, rhs: *LagrangeBasis) !void {
+    pub fn sub(self: *LagrangeBasis, lhs: *const LagrangeBasis, rhs: *const LagrangeBasis) !void {
         if (lhs.evaluations.items.len != rhs.evaluations.items.len) {
             return OperationError.LengthMismatch;
         }
-        self.evaluations = try ArrayList(Fr).initCapacity(lhs.evaluations.len);
-        for (lhs.evaluations.items, 0..) |lhs_i, i| {
-            self.evaluations.appendAssumeCapacity(lhs_i - rhs.evaluations.items[i]);
+
+        try self.evaluations.resize(lhs.evaluations.items.len);
+        for (0..lhs.evaluations.items.len) |i| {
+            self.evaluations.items[i] = lhs.evaluations.items[i].sub(rhs.evaluations.items[i]);
         }
-        self.domain = try lhs.domain.clone();
+
+        try self.domain.resize(lhs.evaluations.items.len);
+        std.mem.copy(Fr, self.domain.items, lhs.domain.items);
     }
 
     pub fn mul(self: *LagrangeBasis, lhs: *LagrangeBasis, rhs: *LagrangeBasis) !void {
         if (lhs.evaluations.items.len != rhs.evaluations.items.len) {
             return OperationError.LengthMismatch;
         }
-        self.evaluations = try ArrayList(Fr).initCapacity(lhs.evaluations.len);
-        for (lhs.evaluations.items, 0..) |lhs_i, i| {
-            self.evaluations.appendAssumeCapacity(lhs_i * rhs.evaluations.items[i]);
+        self.evaluations.resize(lhs.evaluations.len);
+        for (0..lhs.evaluations.items.len) |i| {
+            self.evaluations = lhs.evaluations.items[i].mul(rhs.evaluations.items[i]);
         }
-        self.domain = try lhs.domain.clone();
+        try self.domain.resize(lhs.evaluations.items.len);
+        std.mem.copy(Fr, self.domain.items, lhs.domain.items);
     }
 
     pub fn scale(self: *LagrangeBasis, poly: *LagrangeBasis, constant: Fr) !void {
@@ -141,12 +146,13 @@ pub const LagrangeBasis = struct {
         return MonomialBasis.fromCoeffsFr(b);
     }
 
-    pub fn equal(lhs: *LagrangeBasis, rhs: *LagrangeBasis) bool {
+    pub fn eq(lhs: *const LagrangeBasis, rhs: *const LagrangeBasis) bool {
         if (lhs.evaluations.items.len != rhs.evaluations.items.len) {
+            std.debug.print("{} != {}\n", .{ lhs.evaluations.items.len, rhs.evaluations.items.len });
             return false;
         }
         for (lhs.evaluations.items, 0..) |lhs_i, i| {
-            if (lhs_i != rhs.evaluations.items[i]) {
+            if (!lhs_i.eq(rhs.evaluations.items[i])) {
                 return false;
             }
         }
@@ -155,7 +161,7 @@ pub const LagrangeBasis = struct {
             return false;
         }
         for (lhs.domain.items, 0..) |lhs_i, i| {
-            if (lhs_i != rhs.domain.items[i]) {
+            if (!lhs_i.eq(rhs.domain.items[i])) {
                 return false;
             }
         }
@@ -165,29 +171,29 @@ pub const LagrangeBasis = struct {
 
 var allocator_test = std.testing.allocator;
 
-test "add sub" {
+test "add & sub" {
     const domain = [_]Fr{ Fr.fromInteger(0), Fr.fromInteger(1), Fr.fromInteger(2), Fr.fromInteger(3), Fr.fromInteger(4), Fr.fromInteger(5) };
 
-    // Evaluations
-    // x^2
     const x_squared = [_]Fr{ Fr.fromInteger(0), Fr.fromInteger(1), Fr.fromInteger(4), Fr.fromInteger(9), Fr.fromInteger(16), Fr.fromInteger(25) };
-    // x + 2
-    const x_plus_2 = [_]Fr{ Fr.fromInteger(2), Fr.fromInteger(3), Fr.fromInteger(4), Fr.fromInteger(5), Fr.fromInteger(6), Fr.fromInteger(7) };
-
     const a = try LagrangeBasis.init(allocator_test, &x_squared, &domain);
     defer a.deinit();
+
+    const x_plus_2 = [_]Fr{ Fr.fromInteger(2), Fr.fromInteger(3), Fr.fromInteger(4), Fr.fromInteger(5), Fr.fromInteger(6), Fr.fromInteger(7) };
     const b = try LagrangeBasis.init(allocator_test, &x_plus_2, &domain);
     defer b.deinit();
 
-    const result = a.add(b);
+    var result = try LagrangeBasis.init(allocator_test, &[_]Fr{}, &[_]Fr{});
+    defer result.deinit();
+    try result.add(&a, &b);
 
     const expected_evaluations = [_]Fr{ Fr.fromInteger(2), Fr.fromInteger(4), Fr.fromInteger(8), Fr.fromInteger(14), Fr.fromInteger(22), Fr.fromInteger(32) };
-    const expected_result = LagrangeBasis.init(allocator_test, &expected_evaluations, &domain);
+    var expected_result = try LagrangeBasis.init(allocator_test, &expected_evaluations, &domain);
+    defer expected_result.deinit();
 
-    try std.debug.assert(expected_result.eq(result));
+    try std.testing.expect(expected_result.eq(&result));
 
-    expected_result = expected_result.sub(b);
-    try std.debug.assert(expected_result.eq(a));
+    try expected_result.sub(&expected_result, &b);
+    try std.testing.expect(expected_result.eq(&a));
 }
 
 //     def test_mul(self):
