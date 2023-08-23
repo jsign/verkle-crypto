@@ -10,5 +10,6 @@ test "bandersnatch" {
 
 test "polynomial" {
     _ = @import("polynomial/monomial_basis.zig");
+    _ = @import("polynomial/lagrange_basis.zig");
     std.testing.refAllDeclsRecursive(@This());
 }
