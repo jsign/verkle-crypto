@@ -23,6 +23,16 @@ pub const LagrangeBasis = struct {
         };
     }
 
+    pub fn empty(gpa: std.mem.Allocator) LagrangeBasis {
+        var evals = ArrayList(Fr).init(gpa);
+        var dom = ArrayList(Fr).init(gpa);
+
+        return .{
+            .evaluations = evals,
+            .domain = dom,
+        };
+    }
+
     pub fn deinit(self: LagrangeBasis) void {
         self.evaluations.deinit();
         self.domain.deinit();
@@ -58,24 +68,25 @@ pub const LagrangeBasis = struct {
         std.mem.copy(Fr, self.domain.items, lhs.domain.items);
     }
 
-    pub fn mul(self: *LagrangeBasis, lhs: *LagrangeBasis, rhs: *LagrangeBasis) !void {
+    pub fn mul(self: *LagrangeBasis, lhs: *const LagrangeBasis, rhs: *const LagrangeBasis) !void {
         if (lhs.evaluations.items.len != rhs.evaluations.items.len) {
             return OperationError.LengthMismatch;
         }
-        self.evaluations.resize(lhs.evaluations.len);
+        try self.evaluations.resize(lhs.evaluations.items.len);
         for (0..lhs.evaluations.items.len) |i| {
-            self.evaluations = lhs.evaluations.items[i].mul(rhs.evaluations.items[i]);
+            self.evaluations.items[i] = lhs.evaluations.items[i].mul(rhs.evaluations.items[i]);
         }
         try self.domain.resize(lhs.evaluations.items.len);
         std.mem.copy(Fr, self.domain.items, lhs.domain.items);
     }
 
-    pub fn scale(self: *LagrangeBasis, poly: *LagrangeBasis, constant: Fr) !void {
-        self.evaluations = try ArrayList(Fr).initCapacity(poly.evaluations.len);
-        for (poly.evaluations.items) |eval| {
-            self.evaluations.appendAssumeCapacity(eval * constant);
+    pub fn scale(self: *LagrangeBasis, poly: *const LagrangeBasis, constant: Fr) !void {
+        try self.evaluations.resize(poly.evaluations.items.len);
+        for (0..poly.evaluations.items.len) |i| {
+            self.evaluations.items[i] = poly.evaluations.items[i].mul(constant);
         }
-        self.domain = try poly.domain.clone();
+        try self.domain.resize(poly.evaluations.items.len);
+        std.mem.copy(Fr, self.domain.items, poly.domain.items);
     }
 
     //     # TODO: we cannot add the type PrecomputedWeights because it
@@ -100,50 +111,65 @@ pub const LagrangeBasis = struct {
 
     //         return r
 
-    pub fn interpolate(self: *LagrangeBasis, gpa: std.mem.Allocator) !MonomialBasis {
+    pub fn interpolate(self: *const LagrangeBasis, gpa: std.mem.Allocator) !MonomialBasis {
         const xs = self.domain;
         const ys = self.evaluations;
 
         // Generate master numerator polynomial, eg. (x - x1) * (x - x2) * ... * (x - xn)
-        const root = try MonomialBasis.vanishingPoly(xs);
-        std.debug.assert(root.coeffs.len == ys.len + 1);
+        var root = try MonomialBasis.vanishingPoly(gpa, xs);
+        defer root.deinit();
+
+        std.debug.assert(root.coeffs.items.len == ys.items.len + 1);
 
         // Generate per-value numerator polynomials, eg. for x=x2,
         // (x - x1) * (x - x3) * ... * (x - xn), by dividing the master
         // polynomial back by each x coordinate
-        var nums = try ArrayList(MonomialBasis).initCapacity(gpa, xs.len);
+        var nums = try ArrayList(MonomialBasis).initCapacity(gpa, xs.items.len);
+        defer {
+            for (nums.items) |num| {
+                num.deinit();
+            }
+            nums.deinit();
+        }
+
         for (xs.items) |x| {
-            const num = MonomialBasis.div(gpa, root, MonomialBasis.fromCoeffsFr(&[_]Fr{ -x, Fr.one() }));
+            var temp = try MonomialBasis.fromCoeffsFr(gpa, &[_]Fr{ x.neg(), Fr.one() });
+            defer temp.deinit();
+            const num = try MonomialBasis.div(gpa, root, temp);
             nums.appendAssumeCapacity(num);
         }
 
         //  Generate denominators by evaluating numerator polys at each x
-        var denoms = try ArrayList(MonomialBasis).initCapacity(gpa, xs.len);
+        var denoms = try ArrayList(Fr).initCapacity(gpa, xs.items.len);
+        defer denoms.deinit();
         for (nums.items, 0..) |num, i| {
-            denoms.appendAssumeCapacity(num.evaluate(xs[i]));
+            denoms.appendAssumeCapacity(num.evaluate(xs.items[i]));
         }
-        const invdenoms = Fr.multiInv(denoms);
+        const invdenoms = try Fr.multiInv(gpa, denoms.items);
+        defer invdenoms.deinit();
 
         // Generate output polynomial, which is the sum of the per-value numerator
         // polynomials rescaled to have the right y values
-        var b = try ArrayList(Fr).initCapacity(gpa, ys.len);
-        for (0..ys.len) |_| {
+        var b = try ArrayList(Fr).initCapacity(gpa, ys.items.len);
+        defer b.deinit();
+
+        for (0..ys.items.len) |_| {
             b.appendAssumeCapacity(Fr.zero());
         }
         for (0..xs.items.len) |i| {
-            const yslice = ys[i].mul(invdenoms[i]);
-            for (0..ys.len) |j| {
+            const yslice = ys.items[i].mul(invdenoms.items[i]);
+            for (0..ys.items.len) |j| {
                 //if nums[i][j] and ys[i]:
-                b[j] = b.add(nums[i][j].mul(yslice));
+                b.items[j] = b.items[j].add(nums.items[i].coeffs.items[j].mul(yslice));
             }
         }
         // Remove zero terms from the highest degree until
         // we get to a non-zero term
-        while (b[b.len - 1].IsZero()) {
-            b.pop();
+        while (b.items[b.items.len - 1].isZero()) {
+            _ = b.pop();
         }
 
-        return MonomialBasis.fromCoeffsFr(b);
+        return try MonomialBasis.fromCoeffsFr(gpa, b.items);
     }
 
     pub fn eq(lhs: *const LagrangeBasis, rhs: *const LagrangeBasis) bool {
@@ -196,52 +222,69 @@ test "add & sub" {
     try std.testing.expect(expected_result.eq(&a));
 }
 
-//     def test_mul(self):
-//         domain = [Fr(0), Fr(1), Fr(2), Fr(3), Fr(4), Fr(5)]
+test "mul" {
+    // TODO(jsign): create some helper to do this.
+    const domain = [_]Fr{ Fr.fromInteger(0), Fr.fromInteger(1), Fr.fromInteger(2), Fr.fromInteger(3), Fr.fromInteger(4), Fr.fromInteger(5) };
 
-//         # Evaluations
-//         # x^2
-//         x_squared = [Fr(0), Fr(1), Fr(4), Fr(9), Fr(16), Fr(25)]
-//         # x^4
-//         x_pow_4 = [Fr(0), Fr(1), Fr(16), Fr(81), Fr(256), Fr(625)]
+    //# Evaluations
+    //# x^2
+    const x_squared = [_]Fr{ Fr.fromInteger(0), Fr.fromInteger(1), Fr.fromInteger(4), Fr.fromInteger(9), Fr.fromInteger(16), Fr.fromInteger(25) };
+    //# x^4
+    const x_pow_4 = [_]Fr{ Fr.fromInteger(0), Fr.fromInteger(1), Fr.fromInteger(16), Fr.fromInteger(81), Fr.fromInteger(256), Fr.fromInteger(625) };
 
-//         a = Polynomial(x_squared, domain)
+    const a = try LagrangeBasis.init(allocator_test, &x_squared, &domain);
+    defer a.deinit();
 
-//         result = a * a
+    // TODO(jsign): create an .empty() API.
+    var result = try LagrangeBasis.init(allocator_test, &[_]Fr{}, &[_]Fr{});
+    defer result.deinit();
 
-//         expected_result = Polynomial(x_pow_4, domain)
+    try result.mul(&a, &a);
 
-//         self.assertEqual(expected_result, result)
+    const expected_result = try LagrangeBasis.init(allocator_test, &x_pow_4, &domain);
+    defer expected_result.deinit();
 
-//     def test_scale(self):
-//         domain = [Fr(0), Fr(1), Fr(2), Fr(3), Fr(4), Fr(5)]
+    try std.testing.expect(expected_result.eq(&result));
+}
 
-//         # Evaluations
-//         # x^2
-//         x_squared = [Fr(0), Fr(1), Fr(4), Fr(9), Fr(16), Fr(25)]
-//         constant = Fr(10)
+test "scale" {
+    const domain = [_]Fr{ Fr.fromInteger(0), Fr.fromInteger(1), Fr.fromInteger(2), Fr.fromInteger(3), Fr.fromInteger(4), Fr.fromInteger(5) };
 
-//         a = Polynomial(x_squared, domain)
+    // Evaluations
+    // x^2
+    const x_squared = [_]Fr{ Fr.fromInteger(0), Fr.fromInteger(1), Fr.fromInteger(4), Fr.fromInteger(9), Fr.fromInteger(16), Fr.fromInteger(25) };
+    const constant = Fr.fromInteger(10);
 
-//         result = a * constant
+    const a = try LagrangeBasis.init(allocator_test, &x_squared, &domain);
+    defer a.deinit();
 
-//         expected_evaluations = [
-//             Fr(0), Fr(10), Fr(40), Fr(90), Fr(160), Fr(250)]
+    var result = LagrangeBasis.empty(allocator_test);
+    defer result.deinit();
+    try result.scale(&a, constant);
 
-//         expected_result = Polynomial(expected_evaluations, domain)
+    const expected_evaluations = [_]Fr{ Fr.fromInteger(0), Fr.fromInteger(10), Fr.fromInteger(40), Fr.fromInteger(90), Fr.fromInteger(160), Fr.fromInteger(250) };
 
-//         self.assertEqual(expected_result, result)
+    const expected_result = try LagrangeBasis.init(allocator_test, &expected_evaluations, &domain);
+    defer expected_result.deinit();
 
-//     def test_interpolation(self):
-//         domain = [Fr(0), Fr(1), Fr(2), Fr(3), Fr(4), Fr(5)]
+    try std.testing.expect(expected_result.eq(&result));
+}
 
-//         # Evaluations
-//         # x^2
-//         x_squared = [Fr(0), Fr(1), Fr(4), Fr(9), Fr(16), Fr(25)]
+test "interpolation" {
+    const domain = [_]Fr{ Fr.fromInteger(0), Fr.fromInteger(1), Fr.fromInteger(2), Fr.fromInteger(3), Fr.fromInteger(4), Fr.fromInteger(5) };
 
-//         x_squared_lagrange = Polynomial(x_squared, domain)
-//         x_squared_coeff = x_squared_lagrange.interpolate()
-//         expected_x_squared_coeff = MonomialBasis(
-//             [Fr.zero(), Fr.zero(), Fr.one()])
+    // Evaluations
+    // x^2
+    const x_squared = [_]Fr{ Fr.fromInteger(0), Fr.fromInteger(1), Fr.fromInteger(4), Fr.fromInteger(9), Fr.fromInteger(16), Fr.fromInteger(25) };
 
-//         self.assertEqual(expected_x_squared_coeff, x_squared_coeff)
+    const x_squared_lagrange = try LagrangeBasis.init(allocator_test, &x_squared, &domain);
+    defer x_squared_lagrange.deinit();
+
+    const x_squared_coeff = try x_squared_lagrange.interpolate(allocator_test);
+    defer x_squared_coeff.deinit();
+
+    const expected_x_squared_coeff = try MonomialBasis.fromCoeffsFr(allocator_test, &[_]Fr{ Fr.zero(), Fr.zero(), Fr.one() });
+    defer expected_x_squared_coeff.deinit();
+
+    try std.testing.expect(expected_x_squared_coeff.eq(x_squared_coeff));
+}
