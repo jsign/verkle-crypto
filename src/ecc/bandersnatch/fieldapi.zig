@@ -1,12 +1,10 @@
 const std = @import("std");
 const ArrayList = std.ArrayList;
-const gen_fp = @import("gen_fp.zig");
-const gen_fr = @import("gen_fr.zig");
 
-pub const Fp = BandersnatchField(gen_fp.MontgomeryDomainFieldElement, 52435875175126190479447740508185965837690552500527637822603658699938581184513);
-pub const Fr = BandersnatchField(gen_fr.MontgomeryDomainFieldElement, 13108968793781547619861935127046491459309155893440570251786403306729687672801);
+pub const Fp = BandersnatchField(@import("gen_fp.zig"), 52435875175126190479447740508185965837690552500527637822603658699938581184513);
+pub const Fr = BandersnatchField(@import("gen_fr.zig"), 13108968793781547619861935127046491459309155893440570251786403306729687672801);
 
-fn BandersnatchField(comptime fieldType: type, comptime mod: u256) type {
+fn BandersnatchField(comptime F: type, comptime mod: u256) type {
     const BYTE_LEN = 32;
     comptime {
         std.debug.assert(@bitSizeOf(u256) == BYTE_LEN * 8);
@@ -18,21 +16,21 @@ fn BandersnatchField(comptime fieldType: type, comptime mod: u256) type {
         const Self = @This();
         const Q_MIN_ONE_DIV_2 = (MODULO - 1) / 2;
         const baseZero = val: {
-            var bz: gen_fp.MontgomeryDomainFieldElement = undefined;
-            gen_fp.fromBytes(&bz, [_]u8{0} ** BYTE_LEN);
+            var bz: F.MontgomeryDomainFieldElement = undefined;
+            F.fromBytes(&bz, [_]u8{0} ** BYTE_LEN);
             break :val Self{ .fe = bz };
         };
 
-        fe: fieldType,
+        fe: F.MontgomeryDomainFieldElement,
 
         pub fn fromInteger(num: u256) Self {
             var lbe: [BYTE_LEN]u8 = [_]u8{0} ** BYTE_LEN;
             std.mem.writeInt(u256, lbe[0..], num % MODULO, std.builtin.Endian.Little);
 
-            var nonMont: gen_fp.NonMontgomeryDomainFieldElement = undefined;
-            gen_fp.fromBytes(&nonMont, lbe);
-            var mont: gen_fp.MontgomeryDomainFieldElement = undefined;
-            gen_fp.toMontgomery(&mont, nonMont);
+            var nonMont: F.NonMontgomeryDomainFieldElement = undefined;
+            F.fromBytes(&nonMont, lbe);
+            var mont: F.MontgomeryDomainFieldElement = undefined;
+            F.toMontgomery(&mont, nonMont);
 
             return Self{ .fe = mont };
         }
@@ -43,28 +41,28 @@ fn BandersnatchField(comptime fieldType: type, comptime mod: u256) type {
 
         pub fn one() Self {
             const oneValue = comptime blk: {
-                var baseOne: gen_fp.MontgomeryDomainFieldElement = undefined;
-                gen_fp.setOne(&baseOne);
+                var baseOne: F.MontgomeryDomainFieldElement = undefined;
+                F.setOne(&baseOne);
                 break :blk Self{ .fe = baseOne };
             };
             return oneValue;
         }
 
         pub fn fromBytes(bytes: [BYTE_LEN]u8) Self {
-            var dret: gen_fp.NonMontgomeryDomainFieldElement = undefined;
-            gen_fp.fromBytes(&dret, bytes);
+            var dret: F.NonMontgomeryDomainFieldElement = undefined;
+            F.fromBytes(&dret, bytes);
 
-            var ret: gen_fp.MontgomeryDomainFieldElement = undefined;
-            gen_fp.toMontgomery(&ret, dret);
+            var ret: F.MontgomeryDomainFieldElement = undefined;
+            F.toMontgomery(&ret, dret);
             return Self{ .fe = ret };
         }
 
         pub fn toBytes(self: Self) [BYTE_LEN]u8 {
-            var nonMont: gen_fp.NonMontgomeryDomainFieldElement = undefined;
-            gen_fp.fromMontgomery(&nonMont, self.fe);
+            var nonMont: F.NonMontgomeryDomainFieldElement = undefined;
+            F.fromMontgomery(&nonMont, self.fe);
 
             var ret: [BYTE_LEN]u8 = undefined;
-            gen_fp.toBytes(&ret, nonMont);
+            F.toBytes(&ret, nonMont);
             return ret;
         }
 
@@ -82,9 +80,9 @@ fn BandersnatchField(comptime fieldType: type, comptime mod: u256) type {
             return false;
         }
 
-        pub fn fromMontgomery(self: Self) gen_fp.NonMontgomeryDomainFieldElement {
-            var nonMont: gen_fp.NonMontgomeryDomainFieldElement = undefined;
-            gen_fp.fromMontgomery(&nonMont, self.fe);
+        pub fn fromMontgomery(self: Self) F.NonMontgomeryDomainFieldElement {
+            var nonMont: F.NonMontgomeryDomainFieldElement = undefined;
+            F.fromMontgomery(&nonMont, self.fe);
             return nonMont;
         }
 
@@ -99,26 +97,26 @@ fn BandersnatchField(comptime fieldType: type, comptime mod: u256) type {
         }
 
         pub fn add(self: Self, other: Self) Self {
-            var ret: gen_fp.MontgomeryDomainFieldElement = undefined;
-            gen_fp.add(&ret, self.fe, other.fe);
+            var ret: F.MontgomeryDomainFieldElement = undefined;
+            F.add(&ret, self.fe, other.fe);
             return Self{ .fe = ret };
         }
 
         pub fn sub(self: Self, other: Self) Self {
-            var ret: gen_fp.MontgomeryDomainFieldElement = undefined;
-            gen_fp.sub(&ret, self.fe, other.fe);
+            var ret: F.MontgomeryDomainFieldElement = undefined;
+            F.sub(&ret, self.fe, other.fe);
             return Self{ .fe = ret };
         }
 
         pub fn mul(self: Self, other: Self) Self {
-            var ret: gen_fp.MontgomeryDomainFieldElement = undefined;
-            gen_fp.mul(&ret, self.fe, other.fe);
+            var ret: F.MontgomeryDomainFieldElement = undefined;
+            F.mul(&ret, self.fe, other.fe);
             return Self{ .fe = ret };
         }
 
         pub fn neg(self: Self) Self {
-            var ret: gen_fp.MontgomeryDomainFieldElement = undefined;
-            gen_fp.sub(&ret, baseZero.fe, self.fe);
+            var ret: F.MontgomeryDomainFieldElement = undefined;
+            F.sub(&ret, baseZero.fe, self.fe);
             return Self{ .fe = ret };
         }
 
@@ -143,15 +141,15 @@ fn BandersnatchField(comptime fieldType: type, comptime mod: u256) type {
 
         pub fn inv(self: Self) ?Self {
             var r: u256 = MODULO;
-            var t: i768 = 0;
+            var t: i512 = 0;
 
             var newr: u256 = self.toInteger();
-            var newt: i768 = 1;
+            var newt: i512 = 1;
 
             while (newr != 0) {
                 const quotient = r / newr;
                 const tempt = t - quotient * newt;
-                const tempr = @mod(r, newr);
+                const tempr = r - quotient * newr;
 
                 r = newr;
                 t = newt;
@@ -165,7 +163,7 @@ fn BandersnatchField(comptime fieldType: type, comptime mod: u256) type {
             }
 
             if (t < 0) {
-                return Self.fromInteger(@intCast(u256, t + MODULO));
+                t = t + MODULO;
             }
 
             return Self.fromInteger(@intCast(u256, t));
@@ -181,11 +179,11 @@ fn BandersnatchField(comptime fieldType: type, comptime mod: u256) type {
         }
 
         pub fn toInteger(self: Self) u256 {
-            var nonMont: gen_fp.NonMontgomeryDomainFieldElement = undefined;
-            gen_fp.fromMontgomery(&nonMont, self.fe);
+            var nonMont: F.NonMontgomeryDomainFieldElement = undefined;
+            F.fromMontgomery(&nonMont, self.fe);
 
             var bytes: [BYTE_LEN]u8 = [_]u8{0} ** BYTE_LEN;
-            gen_fp.toBytes(&bytes, nonMont);
+            F.toBytes(&bytes, nonMont);
 
             return std.mem.readInt(u256, &bytes, std.builtin.Endian.Little);
         }
@@ -286,6 +284,8 @@ fn BandersnatchField(comptime fieldType: type, comptime mod: u256) type {
     };
 }
 
+// TODO(jsign): test with Fr.
+
 test "one" {
     const oneFromInteger = Fp.fromInteger(1);
     const oneFromAPI = Fp.one();
@@ -338,11 +338,15 @@ test "add sub mul neg" {
 }
 
 test "inv" {
-    try std.testing.expect(Fp.fromInteger(0).inv() == null);
+    const types = [_]type{ Fp, Fr };
 
-    const one = Fp.one();
-    const cases = [_]Fp{ Fp.fromInteger(1), Fp.fromInteger(42), Fp.fromInteger(Fp.MODULO - 1) };
-    for (cases) |fe| {
-        try std.testing.expect(fe.mul(fe.inv().?).eq(one));
+    inline for (types) |T| {
+        try std.testing.expect(T.fromInteger(0).inv() == null);
+
+        const one = T.one();
+        const cases = [_]T{ T.fromInteger(1), T.fromInteger(42), T.fromInteger(T.MODULO - 1) };
+        for (cases) |fe| {
+            try std.testing.expect(fe.mul(fe.inv().?).eq(one));
+        }
     }
 }
