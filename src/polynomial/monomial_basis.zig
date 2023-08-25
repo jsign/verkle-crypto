@@ -33,7 +33,7 @@ pub const MonomialBasis = struct {
         return .{ .coeffs = cfs };
     }
 
-    pub fn deinit(self: *MonomialBasis) void {
+    pub fn deinit(self: *const MonomialBasis) void {
         self.coeffs.deinit();
     }
 
@@ -81,7 +81,7 @@ pub const MonomialBasis = struct {
         return .{ .coeffs = o };
     }
 
-    pub fn evaluate(self: *MonomialBasis, x: Fr) Fr {
+    pub fn evaluate(self: *const MonomialBasis, x: Fr) Fr {
         var y = Fr.zero();
         var power_of_x = Fr.one();
 
@@ -114,12 +114,22 @@ pub const MonomialBasis = struct {
     }
 
     pub fn eq(self: MonomialBasis, other: MonomialBasis) bool {
-        if (self.coeffs.items.len != other.coeffs.items.len) return false;
+        if (self.coeffs.items.len != other.coeffs.items.len) {
+            return false;
+        }
 
         for (self.coeffs.items, other.coeffs.items) |a, b| {
             if (!a.eq(b)) return false;
         }
         return true;
+    }
+
+    pub fn print(self: MonomialBasis) void {
+        std.debug.print("MonomialBasis(", .{});
+        for (self.coeffs.items) |c| {
+            std.debug.print("{} ", .{c.toInteger()});
+        }
+        std.debug.print(")\n", .{});
     }
 };
 
