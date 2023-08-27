@@ -8,6 +8,11 @@ test "bandersnatch" {
     std.testing.refAllDeclsRecursive(@This());
 }
 
+test "banderwagon" {
+    _ = @import("ecc/bandersnatch/banderwagon.zig");
+    std.testing.refAllDeclsRecursive(@This());
+}
+
 test "polynomial" {
     _ = @import("polynomial/monomial_basis.zig");
     _ = @import("polynomial/lagrange_basis.zig");

@@ -67,6 +67,7 @@ pub const ExtendedPoint = struct {
         return (p.x.mul(q.z).eq(p.z.mul(q.x))) and (p.y.mul(q.z).eq(q.y.mul(p.z)));
     }
 
+    // TODO(jsign): switch to *const.
     pub fn add(p: ExtendedPoint, q: ExtendedPoint) ExtendedPoint {
         // See "Twisted Edwards Curves Revisited" (https: // eprint.iacr.org/2008/522.pdf)
         // by Huseyin Hisil, Kenneth Koon-Ho Wong, Gary Carter, and Ed Dawson

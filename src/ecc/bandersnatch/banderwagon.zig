@@ -3,27 +3,27 @@ const Bandersnatch = @import("bandersnatch.zig");
 const Fp = Bandersnatch.Fp;
 const Fr = Bandersnatch.Fr;
 const AffinePoint = Bandersnatch.AffinePoint;
-const ExtendedPoint = Bandersnatch.AffinePoint;
+const ExtendedPoint = Bandersnatch.ExtendedPoint;
 
 pub const Banderwagon = struct {
-    point: Bandersnatch.ExtendedPoint,
+    point: ExtendedPoint,
 
     pub fn init(serlialized: [32]u8) Banderwagon {
-        const point = try Bandersnatch.ExtendedPointu.init(serlialized);
-        return Banderwagon{ .point = Bandersnatch.ExtendedPoint.initUnsafe(point) };
+        const point = try ExtendedPoint.init(serlialized);
+        return Banderwagon{ .point = ExtendedPoint.initUnsafe(point) };
     }
 
     pub fn initUnsafe(serlialized: [32]u8) Banderwagon {
-        return Banderwagon{ .point = Bandersnatch.ExtendedPoint.initUnsafe(serlialized) };
+        return Banderwagon{ .point = ExtendedPoint.initUnsafe(serlialized) };
     }
 
     pub fn fromBytes(serialised_bytes_big_endian: [32]u8) ?Banderwagon {
         std.mem.reverse(u8, serialised_bytes_big_endian);
 
-        //         Will error if the bytes are not canonical
+        // Will error if the bytes are not canonical
         const x = Fp.fromBytes(serialised_bytes_big_endian) orelse return null;
 
-        //          Will error if the point is not on the curve
+        // Will error if the point is not on the curve
         const y = AffinePoint.getYCoordinate(x, true) orelse return null;
 
         // Will error if x coordinate not a quadratic residue
@@ -31,10 +31,10 @@ pub const Banderwagon = struct {
             return null;
         }
 
-        return Banderwagon{ .point = Bandersnatch.ExtendedPoint.initUnsafe(x, y) };
+        return Banderwagon{ .point = ExtendedPoint.initUnsafe(x, y) };
     }
 
-    pub fn eq(self: Banderwagon, other: Banderwagon) bool {
+    pub fn eq(self: *const Banderwagon, other: *const Banderwagon) bool {
         // The equals method is different for the quotient group
         //
         // Check for the (0,0) point, which is _possible_
@@ -44,21 +44,21 @@ pub const Banderwagon = struct {
         const x2 = other.point.x;
         const y2 = other.point.y;
 
-        if (x1.is_zero() and y1.is_zero()) {
+        if (x1.isZero() and y1.isZero()) {
             return false;
         }
-        if (x2.is_zero() and y2.is_zero()) {
+        if (x2.isZero() and y2.isZero()) {
             return false;
         }
 
-        const lhs = x1 * y2;
-        const rhs = x2 * y1;
+        const lhs = Fp.mul(x1, y2);
+        const rhs = Fp.mul(x2, y1);
 
-        return lhs == rhs;
+        return Fp.eq(lhs, rhs);
     }
 
     pub fn generator() Banderwagon {
-        return Banderwagon.init(null, Bandersnatch.ExtendedPoint.generator());
+        return .{ .point = ExtendedPoint.generator() };
     }
 
     pub fn neg(self: Banderwagon, p: Banderwagon) Banderwagon {
@@ -66,9 +66,8 @@ pub const Banderwagon = struct {
         return self;
     }
 
-    pub fn add(self: Banderwagon, p: Banderwagon, q: Banderwagon) Banderwagon {
-        self.point = p.point + q.point;
-        return self;
+    pub fn add(self: *Banderwagon, p: *const Banderwagon, q: *const Banderwagon) void {
+        self.point = ExtendedPoint.add(p.point, q.point);
     }
 
     pub fn sub(self: Banderwagon, p: Banderwagon, q: Banderwagon) Banderwagon {
@@ -138,9 +137,9 @@ pub const Banderwagon = struct {
         return Banderwagon{ .point = ExtendedPoint.identity() };
     }
 
-    pub fn two_torsion_point() Banderwagon {
-        const affine_point = AffinePoint(Fp.zero(), -Fp.one());
-        return Banderwagon{ .point = ExtendedPoint(affine_point) };
+    pub fn twoTorsionPoint() Banderwagon {
+        const point = ExtendedPoint.init(Fp.zero(), Fp.one().neg()) catch unreachable;
+        return Banderwagon{ .point = point };
     }
 
     // Multi scalar multiplication
@@ -175,11 +174,7 @@ pub const Banderwagon = struct {
     //         return result
 };
 
-test "banderwagon" {
-    //     import unittest
-    // from .banderwagon import Banderwagon
-
-    // class TestBanderwagon(unittest.TestCase):
+test "serialize smoke" {
 
     //     def test_serialise_smoke(self):
     //         # Each successive point is a doubling of the previous one
@@ -222,18 +217,16 @@ test "banderwagon" {
     //             self.assertIsNotNone(point)
 
     //             self.assertEqual(decoded_point, expected_point)
+}
 
-    //     def test_two_torsion(self):
-    //         # two points which differ by the order two point (0,-1) should be
-    //         # considered the same
-    //         gen = Banderwagon.generator()
-    //         two_torsion = Banderwagon.two_torsion_point()
+test "two torsion" {
+    // two points which differ by the order two point (0,-1) should be
+    // considered the same
+    const gen = Banderwagon.generator();
+    const two_torsion = Banderwagon.twoTorsionPoint();
 
-    //         result = Banderwagon.identity()
-    //         result.add(gen, two_torsion)
+    var result = Banderwagon.identity();
+    result.add(&gen, &two_torsion);
 
-    //         self.assertEqual(result, gen)
-
-    // if __name__ == '__main__':
-    //     unittest.main()
+    try std.testing.expect(result.eq(&gen));
 }
