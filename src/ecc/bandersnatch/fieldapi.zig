@@ -49,6 +49,7 @@ fn BandersnatchField(comptime F: type, comptime mod: u256) type {
         }
 
         pub fn fromBytes(bytes: [BYTE_LEN]u8) Self {
+            std.debug.assert(bytes.len == BYTE_LEN);
             var dret: F.NonMontgomeryDomainFieldElement = undefined;
             F.fromBytes(&dret, bytes);
 
@@ -66,18 +67,9 @@ fn BandersnatchField(comptime F: type, comptime mod: u256) type {
             return ret;
         }
 
-        // TODO
-        //pub fn fromBytesReduce()
-        //     def from_bytes_reduce(bytes):
-        //         return Fp(None, Field.from_bytes_reduce(bytes, BASE_FIELD))
-
-        pub fn lexographically_largest(self: Self) bool {
-            const selfNonMont = self.fromMontgomery();
-            const qminusonediv2 = comptime fromInteger(Q_MIN_ONE_DIV_2).fromMontgomery();
-            inline for (selfNonMont, 0..) |elem, i| {
-                if (elem > qminusonediv2[i]) return true;
-            }
-            return false;
+        pub fn lexographicallyLargest(self: Self) bool {
+            const selfNonMont = self.toInteger();
+            return selfNonMont > Q_MIN_ONE_DIV_2;
         }
 
         pub fn fromMontgomery(self: Self) F.NonMontgomeryDomainFieldElement {
@@ -128,13 +120,16 @@ fn BandersnatchField(comptime F: type, comptime mod: u256) type {
             return self.eq(one());
         }
 
-        // TODO(improv): this is naive, do something better.
         pub fn pow(self: Self, exponent: u256) Self {
-            var res: Self = self;
+            var res = one();
             var exp = exponent;
-            while (exponent > 1) {
-                res = res.mul(self);
-                exp -= 1;
+            var base = self;
+
+            while (exp > 0) : (exp = exp / 2) {
+                if (exp & 1 == 1) {
+                    res = res.mul(base);
+                }
+                base = base.mul(base);
             }
             return res;
         }
@@ -169,8 +164,8 @@ fn BandersnatchField(comptime F: type, comptime mod: u256) type {
             return Self.fromInteger(@intCast(u256, t));
         }
 
-        pub fn div(self: Self, den: Self) ?Self {
-            const denInv = den.inv() orelse return null;
+        pub fn div(self: Self, den: Self) !Self {
+            const denInv = den.inv() orelse return error.DivisionByZero;
             return self.mul(denInv);
         }
 
@@ -188,84 +183,92 @@ fn BandersnatchField(comptime F: type, comptime mod: u256) type {
             return std.mem.readInt(u256, &bytes, std.builtin.Endian.Little);
         }
 
-        // TODO
-        // def modular_sqrt(a, p):
-        //     """ Find a quadratic residue (mod p) of 'a'. p
-        //         must be an odd prime.
-        //         Solve the congruence of the form:
-        //             x^2 = a (mod p)
-        //         And returns x. Note that p - x is also a root.
-        //         0 is returned is no square root exists for
-        //         these a and p.
-        //         The Tonelli-Shanks algorithm is used (except
-        //         for some simple cases in which the solution
-        //         is known from an identity). This algorithm
-        //         runs in polynomial time (unless the
-        //         generalized Riemann hypothesis is false).
-        //     """
-        //     # Simple cases
-        //     #
-        //     if legendre_symbol(a, p) != 1:
-        //         return None
-        //     elif a == 0:
-        //         return 0
-        //     elif p == 2:
-        //         return 0
-        //     elif p % 4 == 3:
-        //         return pow(a, (p + 1) // 4, p)
+        pub fn sqrt(a: Self) ?Self {
+            // Find a quadratic residue (mod p) of 'a'. p
+            // must be an odd prime.
+            // Solve the congruence of the form:
+            //     x^2 = a (mod p)
+            // And returns x. Note that p - x is also a root.
+            // 0 is returned is no square root exists for
+            // these a and p.
+            // The Tonelli-Shanks algorithm is used (except
+            // for some simple cases in which the solution
+            // is known from an identity). This algorithm
+            // runs in polynomial time (unless the
+            // generalized Riemann hypothesis is false).
 
-        //     # Partition p-1 to s * 2^e for an odd s (i.e.
-        //     # reduce all the powers of 2 from p-1)
-        //     #
-        //     s = p - 1
-        //     e = 0
-        //     while s % 2 == 0:
-        //         s //= 2
-        //         e += 1
+            // Simple cases
+            if (Self.legendre(a) != 1) {
+                return null;
+            } else if (a.isZero()) {
+                return Self.zero();
+            }
 
-        //     # Find some 'n' with a legendre symbol n|p = -1.
-        //     # Shouldn't take long.
-        //     #
-        //     n = 2
-        //     while legendre_symbol(n, p) != -1:
-        //         n += 1
+            // Partition p-1 to s * 2^e for an odd s (i.e.
+            // reduce all the powers of 2 from p-1)
+            const s_e = comptime blk: {
+                var s = MODULO - 1;
+                var e = 0;
+                while (s % 2 == 0) {
+                    s = s / 2;
+                    e = e + 1;
+                }
+                break :blk .{ .s = s, .e = e };
+            };
+            const s = s_e.s;
+            const e = s_e.e;
 
-        //     # Here be dragons!
-        //     # Read the paper "Square roots from 1; 24, 51,
-        //     # 10 to Dan Shanks" by Ezra Brown for more
-        //     # information
-        //     #
+            // Find some 'n' with a legendre symbol n|p = -1.
+            // Shouldn't take long.
+            const n = comptime blk: {
+                @setEvalBranchQuota(100_000_00);
+                var n = fromInteger(2);
+                while (legendre(n) != -1) {
+                    n = n.add(one());
+                }
+                break :blk n;
+            };
 
-        //     # x is a guess of the square root that gets better
-        //     # with each iteration.
-        //     # b is the "fudge factor" - by how much we're off
-        //     # with the guess. The invariant x^2 = ab (mod p)
-        //     # is maintained throughout the loop.
-        //     # g is used for successive powers of n to update
-        //     # both a and b
-        //     # r is the exponent - decreases with each update
-        //     #
-        //     x = pow(a, (s + 1) // 2, p)
-        //     b = pow(a, s, p)
-        //     g = pow(n, s, p)
-        //     r = e
+            // Here be dragons!
+            // Read the paper "Square roots from 1; 24, 51,
+            // 10 to Dan Shanks" by Ezra Brown for more
+            // information
 
-        //     while True:
-        //         t = b
-        //         m = 0
-        //         for m in range(r):
-        //             if t == 1:
-        //                 break
-        //             t = pow(t, 2, p)
+            // x is a guess of the square root that gets better
+            // with each iteration.
+            // b is the "fudge factor" - by how much we're off
+            // with the guess. The invariant x^2 = ab (mod p)
+            // is maintained throughout the loop.
+            // g is used for successive powers of n to update
+            // both a and b
+            // r is the exponent - decreases with each update
+            var x = a.pow((s + 1) / 2);
+            var b = a.pow(s);
+            var g = n.pow(s);
+            var r: u256 = e;
 
-        //         if m == 0:
-        //             return x
+            while (true) {
+                var t = b;
+                var m: u256 = 0;
+                blk: while (m < r) : (m = m + 1) {
+                    if (t.isOne()) {
+                        break :blk;
+                    }
+                    t = t.pow(2);
+                }
 
-        //         gs = pow(g, 2 ** (r - m - 1), p)
-        //         g = (gs * gs) % p
-        //         x = (x * gs) % p
-        //         b = (b * g) % p
-        //         r = m
+                if (m == 0) {
+                    return x;
+                }
+
+                const gs = g.pow(std.math.pow(u256, 2, r - m - 1));
+                g = gs.mul(gs);
+                x = x.mul(gs);
+                b = b.mul(g);
+                r = m;
+            }
+            unreachable;
+        }
 
         pub fn legendre(a: Self) i2 {
             // Compute the Legendre symbol a|p using
@@ -276,10 +279,13 @@ fn BandersnatchField(comptime F: type, comptime mod: u256) type {
             // p, -1 otherwise.
             const ls = a.pow((MODULO - 1) / 2);
 
-            if (ls == MODULO - 1) {
+            const moduloMinusOne = comptime fromInteger(MODULO - 1);
+            if (ls.eq(moduloMinusOne)) {
                 return -1;
+            } else if (ls.isZero()) {
+                return 0;
             }
-            return ls;
+            return 1;
         }
     };
 }
@@ -301,11 +307,11 @@ test "zero" {
 }
 
 test "lexographically largest" {
-    try std.testing.expect(!Fp.fromInteger(0).lexographically_largest());
-    try std.testing.expect(!Fp.fromInteger(Fp.Q_MIN_ONE_DIV_2).lexographically_largest());
+    try std.testing.expect(!Fp.fromInteger(0).lexographicallyLargest());
+    try std.testing.expect(!Fp.fromInteger(Fp.Q_MIN_ONE_DIV_2).lexographicallyLargest());
 
-    try std.testing.expect(Fp.fromInteger(Fp.Q_MIN_ONE_DIV_2 + 1).lexographically_largest());
-    try std.testing.expect(Fp.fromInteger(Fp.MODULO - 1).lexographically_largest());
+    try std.testing.expect(Fp.fromInteger(Fp.Q_MIN_ONE_DIV_2 + 1).lexographicallyLargest());
+    try std.testing.expect(Fp.fromInteger(Fp.MODULO - 1).lexographicallyLargest());
 }
 
 test "from and to bytes" {
@@ -349,4 +355,20 @@ test "inv" {
             try std.testing.expect(fe.mul(fe.inv().?).eq(one));
         }
     }
+}
+
+test "sqrt" {
+    // Test that a non-residue has no square root.
+    const nonresidue = Fp.fromInteger(42);
+    try std.testing.expect(nonresidue.legendre() != 1);
+    try std.testing.expect(nonresidue.sqrt() == null);
+
+    // Test that a residue has a square root and sqrt(b)^2=b.
+    const b = Fp.fromInteger(44);
+    try std.testing.expect(b.legendre() == 1);
+
+    const b_sqrt = b.sqrt().?;
+    const b_sqrt_sqr = b_sqrt.mul(b_sqrt);
+
+    try std.testing.expect(b.eq(b_sqrt_sqr));
 }
