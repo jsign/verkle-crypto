@@ -101,7 +101,7 @@ pub const AffinePoint = struct {
         const mCompressedPositive = 0x00;
 
         var mask: u8 = mCompressedPositive;
-        if (self.y.lexographically_largest()) {
+        if (self.y.lexographicallyLargest()) {
             mask = mCompressedNegative;
         }
 
@@ -126,7 +126,7 @@ pub const AffinePoint = struct {
         return lhs.eq(rhs);
     }
 
-    pub fn getYCoordinate(x: Fp, returnPositiveY: bool) ?Fp {
+    pub fn getYCoordinate(x: Fp, returnPositiveY: bool) !Fp {
         const one = Fp.one();
 
         const num = x.mul(x);
@@ -135,12 +135,12 @@ pub const AffinePoint = struct {
         const num2 = num.mul(Bandersnatch.A).sub(one);
 
         // This can only be None if the denominator is zero
-        const y = num2.div(den) orelse return null; // y^2
+        var y = try num2.div(den); // y^2
 
         // This means that the square root does not exist
-        y = y.sqrt(y) orelse return null;
+        y = y.sqrt() orelse return error.NotInCurve;
 
-        const is_largest = y.lexographically_largest();
+        const is_largest = y.lexographicallyLargest();
         if (returnPositiveY == is_largest) {
             return y;
         }
