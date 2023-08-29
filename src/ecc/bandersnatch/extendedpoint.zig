@@ -1,3 +1,4 @@
+const std = @import("std");
 const Bandersnatch = @import("bandersnatch.zig");
 const Fp = Bandersnatch.Fp;
 const Fr = Bandersnatch.Fr;
@@ -83,26 +84,26 @@ pub const ExtendedPoint = struct {
         const t2 = q.t;
         const z2 = q.z;
 
-        const a = x1.mul(x2);
+        const a = Fp.mul(x1, x2);
 
-        const b = y1.mul(y2);
+        const b = Fp.mul(y1, y2);
 
-        const c = Bandersnatch.D.mul(t1).mul(t2);
+        const c = Fp.mul(Bandersnatch.D, Fp.mul(t1, t2));
 
-        const d = z1.mul(z2);
+        const d = Fp.mul(z1, z2);
 
-        const h = b.sub(a.mul(Bandersnatch.A));
+        const h = Fp.sub(b, Fp.mul(a, Bandersnatch.A));
 
-        const e = x1.add(y1).mul(x2.add(y2)).sub(a).sub(b);
+        const e = Fp.sub(Fp.sub(Fp.mul(Fp.add(x1, y1), Fp.add(x2, y2)), b), a);
 
-        const f = d.sub(c);
-        const g = d.add(c);
+        const f = Fp.sub(d, c);
+        const g = Fp.add(d, c);
 
         return ExtendedPoint{
-            .x = e.mul(f),
-            .y = g.mul(h),
-            .t = e.mul(h),
-            .z = f.mul(g),
+            .x = Fp.mul(e, f),
+            .y = Fp.mul(g, h),
+            .t = Fp.mul(e, h),
+            .z = Fp.mul(f, g),
         };
     }
 
