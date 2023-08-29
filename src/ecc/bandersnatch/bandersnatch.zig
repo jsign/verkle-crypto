@@ -7,7 +7,7 @@ pub const Fr = FieldApi.Fr;
 
 // Curve parameters.
 pub const A = Fp.fromInteger(Fp.MODULO - 5);
-pub const D = Fp.fromInteger(138827208126141220649022263972958607803).div(Fp.fromInteger(171449701953573178309673572579671231137)).?;
+pub const D = Fp.fromInteger(138827208126141220649022263972958607803).div(Fp.fromInteger(171449701953573178309673572579671231137)) catch unreachable;
 
 // Points.
 pub const AffinePoint = @import("affinepoint.zig").AffinePoint;
