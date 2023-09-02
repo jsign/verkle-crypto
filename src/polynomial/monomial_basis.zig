@@ -59,7 +59,7 @@ pub const MonomialBasis = struct {
         var diff = apos - bpos;
 
         diffloop: while (diff >= 0) {
-            const quot = Fr.div(az.items[apos], b.coeffs.items[bpos]).?;
+            const quot = try Fr.div(az.items[apos], b.coeffs.items[bpos]);
             try o.insert(0, quot);
 
             var i = bpos;
