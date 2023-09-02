@@ -16,5 +16,6 @@ test "banderwagon" {
 test "polynomial" {
     _ = @import("polynomial/monomial_basis.zig");
     _ = @import("polynomial/lagrange_basis.zig");
+    _ = @import("polynomial/precomputed_Weights.zig");
     std.testing.refAllDeclsRecursive(@This());
 }
