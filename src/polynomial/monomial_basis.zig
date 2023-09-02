@@ -19,7 +19,7 @@ pub const MonomialBasis = struct {
         return .{ .coeffs = ArrayList(Fr).init(allocator) };
     }
 
-    pub fn fromCoeffsFr(gpa: std.mem.Allocator, coeffs: []Fr) !MonomialBasis {
+    pub fn fromCoeffsFr(gpa: std.mem.Allocator, coeffs: []const Fr) !MonomialBasis {
         var cfs = try ArrayList(Fr).initCapacity(gpa, coeffs.len);
         try cfs.appendSlice(coeffs);
         return .{ .coeffs = cfs };
@@ -100,11 +100,11 @@ pub const MonomialBasis = struct {
         return .{ .coeffs = coeffs };
     }
 
-    pub fn vanishingPoly(allocator: std.mem.Allocator, xs: ArrayList(Fr)) !MonomialBasis {
+    pub fn vanishingPoly(allocator: std.mem.Allocator, xs: []const Fr) !MonomialBasis {
         var root = ArrayList(Fr).init(allocator);
         try root.append(Fr.one());
 
-        for (xs.items) |x| {
+        for (xs) |x| {
             try root.insert(0, Fr.zero());
             for (0..root.items.len - 1) |j| {
                 root.items[j] = Fr.sub(root.items[j], Fr.mul(root.items[j + 1], x));
@@ -140,7 +140,7 @@ test "Vanishing Polynomial on domain" {
     defer xs.deinit();
     try xs.appendSlice(&[_]Fr{ Fr.fromInteger(0), Fr.fromInteger(1), Fr.fromInteger(2), Fr.fromInteger(3), Fr.fromInteger(4), Fr.fromInteger(5) });
 
-    var z = try MonomialBasis.vanishingPoly(allocator_test, xs);
+    var z = try MonomialBasis.vanishingPoly(allocator_test, xs.items);
     defer z.deinit();
 
     for (xs.items) |x| {

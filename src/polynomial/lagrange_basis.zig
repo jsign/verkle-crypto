@@ -9,7 +9,7 @@ pub const OperationError = error{LengthMismatch};
 // TODO(jsign): see if we can avoid using an allocator.
 pub const LagrangeBasis = struct {
     evaluations: ArrayList(Fr),
-    domain: ArrayList(Fr),
+    domain: ArrayList(Fr), // TODO(jsign): slice
 
     pub fn init(gpa: std.mem.Allocator, evaluations: []const Fr, domain: []const Fr) !LagrangeBasis {
         var evals = try ArrayList(Fr).initCapacity(gpa, evaluations.len);
@@ -116,7 +116,7 @@ pub const LagrangeBasis = struct {
         const ys = self.evaluations;
 
         // Generate master numerator polynomial, eg. (x - x1) * (x - x2) * ... * (x - xn)
-        var root = try MonomialBasis.vanishingPoly(gpa, xs);
+        var root = try MonomialBasis.vanishingPoly(gpa, xs.items);
         defer root.deinit();
 
         std.debug.assert(root.coeffs.items.len == ys.items.len + 1);
