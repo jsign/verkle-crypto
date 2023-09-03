@@ -93,16 +93,16 @@ const PrecomputedWeights = struct {
 
         return r;
     }
-
-    fn checkDomainIsContinousAndIncreasing(domain: []Fr) bool {
-        for (1..domain.len) |i| {
-            if (!Fr.sub(domain[i], domain[i - 1]).isOne()) {
-                return false;
-            }
-        }
-        return true;
-    }
 };
+
+fn checkDomainIsContinousAndIncreasing(domain: []Fr) bool {
+    for (1..domain.len) |i| {
+        if (!Fr.sub(domain[i], domain[i - 1]).isOne()) {
+            return false;
+        }
+    }
+    return true;
+}
 
 // TODO: this test is commented in the spec.
 // #     def test_domain_correctness(self):

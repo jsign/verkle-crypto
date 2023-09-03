@@ -7,6 +7,7 @@ const ExtendedPoint = Bandersnatch.ExtendedPoint;
 const ArrayList = std.ArrayList;
 const allocator_test = std.testing.allocator;
 
+// TODO(jsign): move to separate module.
 pub const Banderwagon = struct {
     point: ExtendedPoint,
 
