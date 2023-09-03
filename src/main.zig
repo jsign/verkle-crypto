@@ -1,5 +1,4 @@
 const std = @import("std");
-const bander = @import("ecc/bandersnatch/bandersnatch.zig");
 
 pub fn main() !void {}
 
@@ -16,6 +15,11 @@ test "banderwagon" {
 test "polynomial" {
     _ = @import("polynomial/monomial_basis.zig");
     _ = @import("polynomial/lagrange_basis.zig");
-    _ = @import("polynomial/precomputed_Weights.zig");
+    _ = @import("polynomial/precomputed_weights.zig");
+    std.testing.refAllDeclsRecursive(@This());
+}
+
+test "crs" {
+    _ = @import("crs/crs.zig");
     std.testing.refAllDeclsRecursive(@This());
 }
