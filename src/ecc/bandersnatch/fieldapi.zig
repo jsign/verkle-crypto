@@ -220,8 +220,8 @@ fn BandersnatchField(comptime F: type, comptime mod: u256) type {
 
             // Find some 'n' with a legendre symbol n|p = -1.
             // Shouldn't take long.
-            const n = comptime blk: {
-                @setEvalBranchQuota(100_000_00);
+            // TODO(jsign): switch to comptime again but optionally.
+            const n = blk: {
                 var n = fromInteger(2);
                 while (legendre(n) != -1) {
                     n = n.add(one());
