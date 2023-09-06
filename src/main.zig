@@ -23,3 +23,9 @@ test "crs" {
     _ = @import("crs/crs.zig");
     std.testing.refAllDeclsRecursive(@This());
 }
+
+test "ipa" {
+    _ = @import("ipa/common.zig");
+    _ = @import("ipa/transcript.zig");
+    std.testing.refAllDeclsRecursive(@This());
+}
