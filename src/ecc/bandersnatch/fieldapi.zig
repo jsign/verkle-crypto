@@ -5,13 +5,13 @@ pub const Fp = BandersnatchField(@import("gen_fp.zig"), 524358751751261904794477
 pub const Fr = BandersnatchField(@import("gen_fr.zig"), 13108968793781547619861935127046491459309155893440570251786403306729687672801);
 
 fn BandersnatchField(comptime F: type, comptime mod: u256) type {
-    const BYTE_LEN = 32;
-    comptime {
-        std.debug.assert(@bitSizeOf(u256) == BYTE_LEN * 8);
-    }
-
     return struct {
+        pub const BYTE_LEN = 32;
         pub const MODULO = mod;
+
+        comptime {
+            std.debug.assert(@bitSizeOf(u256) == BYTE_LEN * 8);
+        }
 
         const Self = @This();
         const Q_MIN_ONE_DIV_2 = (MODULO - 1) / 2;
