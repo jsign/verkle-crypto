@@ -128,8 +128,8 @@ pub const Banderwagon = struct {
         };
     }
 
-    pub fn scalar_mul(self: Banderwagon, element: Banderwagon, scalar: Fr) Banderwagon {
-        self.point = element.point * scalar;
+    pub fn scalarMul(self: Banderwagon, element: Banderwagon, scalar: Fr) Banderwagon {
+        self.point = element.point.scalarMul(scalar);
         return self;
     }
 
@@ -143,14 +143,15 @@ pub const Banderwagon = struct {
     }
 
     // Multi scalar multiplication
-    // pub fn msm(points: List[Banderwagon], scalars: List[Fr]) Bandewagon {
-    //             var res = Banderwagon.identity();
+    pub fn msm(points: []Banderwagon, scalars: []Fr) Banderwagon {
+        var res = Banderwagon.identity();
 
-    //             for scalar, point in zip(scalars, points):
-    //                 partial_res = point * scalar;
-    //                 res = res + partial_res;
-    //             return res;
-    // }
+        for (scalars, points) |scalar, point| {
+            const partial_res = point.scalarMul(scalar);
+            res = res.add(res, partial_res);
+        }
+        return res;
+    }
 };
 
 test "serialize smoke" {
