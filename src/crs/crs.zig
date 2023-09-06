@@ -6,6 +6,7 @@ const Fr = Bandersnatch.Fr;
 const Banderwagon = @import("../ecc/bandersnatch/banderwagon.zig").Banderwagon;
 
 const CRS = struct {
+    allocator: ?Allocator,
     BASIS_G: []Banderwagon,
     BASIS_Q: Banderwagon,
 
@@ -15,32 +16,25 @@ const CRS = struct {
             .BASIS_Q = Banderwagon.generator(),
         };
     }
-    //     def generate_crs(seed):
-    //         # This should follow the procedure listed in the relevant hackmd
-    //         # For now we use constants generated from the Rust code, that the golang code agrees with
-    //         pass
 
-    //     def __getitem__(self, index):
-    //         return self.BASIS_G[index]
+    pub fn deinit(self: *CRS) void {
+        if (self.allocator) {
+            self.allocator.free(self.BASIS_G);
+            self.allocator = null;
+        }
+    }
 
-    //     def default():
-    //         crs = get_crs()
-    //         return CRS(crs)
+    pub fn getItem(self: CRS, index: usize) Banderwagon {
+        return self.BASIS_G[index];
+    }
 
-    //     def commit_sparse(self, values: Dict[int, Fr]) -> Banderwagon:
-    //         if len(values) == 0:
-    //             return Banderwagon.identity()
-
-    //         commitment = commit([self.BASIS_G[i]
-    //                             for i in values.keys()], [x for x in values.values()])
-    //         return commitment
-
-    //     def commit(self, values: List[Fr]):
-    //         elements = [self.BASIS_G[i] for i, _ in enumerate(values)]
-    //         return commit(elements, values)
-
-    // def commit(elements: List[Banderwagon], values: List[Fr]):
-    //     return Banderwagon.msm(elements, values)
+    pub fn default(allocator: Allocator) !CRS {
+        return .{
+            .BASIS_G = try getCRS(allocator),
+            .BASIS_Q = Banderwagon.generator(),
+            .allocator = allocator,
+        };
+    }
 };
 
 // TODO(jsign): despite not necessary, we can avoid hardcoded points and try to derive them
@@ -320,11 +314,6 @@ fn getCRS(allocator: Allocator) ![]Banderwagon {
     return points;
 }
 
-// import hashlib
-// from crs import get_crs
-// import unittest
-// from ecc import Banderwagon
-
 const testAllocator = std.testing.allocator;
 test "crs is consistent" {
     // Test that the CRS is consistent with https://hackmd.io/1RcGSMQgT4uREaq1CCx_cg#Methodology
@@ -349,17 +338,15 @@ test "crs is consistent" {
     try std.testing.expectEqualStrings("1fcaea10bf24f750200e06fa473c76ff0468007291fa548e2d99f09ba9256fdb", &result_hex);
 }
 
-//     def test_crs_not_generator(self):
-//         """
-//             We use the generator point as the point `Q`, corresponding to the inner product
-//             so we check if the generated point is one of these
-//         """
-//         crs = get_crs()
+test "not generator" {
+    // We use the generator point as the point `Q`, corresponding to the inner product
+    // so we check if the generated point is one of these
+    const crs = try getCRS(testAllocator);
+    defer testAllocator.free(crs);
 
-//         generator = Banderwagon.generator()
+    const generator = Banderwagon.generator();
 
-//         for point in crs:
-//             self.assertNotEqual(generator, point)
-
-// if __name__ == '__main__':
-//     unittest.main()
+    for (crs) |point| {
+        try std.testing.expect(!generator.eq(&point));
+    }
+}
