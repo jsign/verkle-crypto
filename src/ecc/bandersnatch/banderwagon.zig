@@ -128,9 +128,11 @@ pub const Banderwagon = struct {
         };
     }
 
-    pub fn scalarMul(self: Banderwagon, element: Banderwagon, scalar: Fr) Banderwagon {
-        self.point = element.point.scalarMul(scalar);
-        return self;
+    // TODO(jsign): weird api.
+    pub fn scalarMul(element: Banderwagon, scalar: Fr) Banderwagon {
+        return Banderwagon{
+            .point = ExtendedPoint.scalarMul(element.point, scalar),
+        };
     }
 
     pub fn identity() Banderwagon {
@@ -148,7 +150,7 @@ pub const Banderwagon = struct {
 
         for (scalars, points) |scalar, point| {
             const partial_res = point.scalarMul(scalar);
-            res = res.add(res, partial_res);
+            res.add(&res, &partial_res);
         }
         return res;
     }
