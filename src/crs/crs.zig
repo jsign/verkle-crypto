@@ -28,6 +28,11 @@ const CRS = struct {
         return self.BASIS_G[index];
     }
 
+    pub fn commit(self: *CRS, values: []Fr) Banderwagon {
+        std.debug.assert(self.BASIS_G.len >= values.len);
+        return Banderwagon.msm(self.BASIS_G[0..values.len], values);
+    }
+
     pub fn default(allocator: Allocator) !CRS {
         return .{
             .BASIS_G = try getCRS(allocator),
