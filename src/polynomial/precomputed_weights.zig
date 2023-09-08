@@ -7,7 +7,7 @@ const MonomialBasis = @import("monomial_basis.zig").MonomialBasis;
 const LagrangeBasis = @import("lagrange_basis.zig").LagrangeBasis; // TODO(jsign): reconsider having the wrapper.
 
 // TODO(jsign): comptime?
-const PrecomputedWeights = struct {
+pub const PrecomputedWeights = struct {
     // TODO: We don't _need_ to store the vanishing polynomial
     // TODO: we only need to store its derivative and whenever we need to evaluate
     // TODO: the vanishing polynomial, it can be done via the domain
@@ -17,9 +17,9 @@ const PrecomputedWeights = struct {
     // Derivative of the vanishing polynomial
     Aprime: MonomialBasis,
     // Aprime evaluated on the domain
-    Aprime_DOMAIN: LagrangeBasis,
+    Aprime_DOMAIN: []Fr,
     // Aprime evaluated on the domain and then inverted
-    Aprime_DOMAIN_inv: LagrangeBasis,
+    Aprime_DOMAIN_inv: []Fr,
     // Domain
     domain: []const Fr,
     //Inverse of the domain
@@ -28,26 +28,20 @@ const PrecomputedWeights = struct {
     // TODO(jsign): avoid allocators.
     allocator: Allocator,
 
-    pub fn init(allocator: Allocator, domain: []Fr) PrecomputedWeights {
+    pub fn init(allocator: Allocator, domain: []Fr) !PrecomputedWeights {
         assert(checkDomainIsContinousAndIncreasing(domain));
 
-        var dom = allocator.alloc(Fr, domain.len);
+        var dom = try allocator.alloc(Fr, domain.len);
         for (domain, 0..) |x, i| {
             dom[i] = x;
         }
-        var A = MonomialBasis.vanishingPoly(allocator, dom);
-        var ret = PrecomputedWeights{
-            .allocator = allocator,
-            .domain = dom,
-            .A = A,
-            .Aprime = MonomialBasis.formalDerivative(allocator, A),
-        };
-
-        var Aprime_domain = allocator.alloc(Fr, domain.len);
-        var Aprime_domain_inv = allocator.alloc(Fr, domain.len);
+        const A = try MonomialBasis.vanishingPoly(allocator, dom);
+        const Aprime = try MonomialBasis.formalDerivative(allocator, A);
+        const Aprime_domain = try allocator.alloc(Fr, domain.len);
+        const Aprime_domain_inv = try allocator.alloc(Fr, domain.len);
 
         for (0..domain.len) |i| {
-            Aprime_domain[i] = ret.Aprime.evaluate(Fr.fromInteger(i));
+            Aprime_domain[i] = Aprime.evaluate(Fr.fromInteger(i));
             Aprime_domain_inv[i] = Fr.inv(Aprime_domain[i]).?; // TODO(jsign): could do batching.
         }
 
@@ -56,7 +50,7 @@ const PrecomputedWeights = struct {
         // TODO: refactor this to make it more readable
         // If domain size is 4 for example, the output would be:
         // [1/0, 1/1, 1/2, 1/3, -1/3, -1/2,-1/1]
-        const inverses = allocator.alloc(Fr, 2 * domain.len);
+        const inverses = try allocator.alloc(Fr, 2 * domain.len);
         for (0..domain.len) |d| {
             inverses[d] = Fr.inv(Fr.fromInteger(d)) orelse Fr.zero(); // It should only happen for 0.
             inverses[domain.len + d] = Fr.inv(Fr.fromInteger(Fr.MODULO - d)) orelse Fr.zero();
@@ -65,12 +59,21 @@ const PrecomputedWeights = struct {
         return PrecomputedWeights{
             .allocator = allocator,
             .A = A,
-            .Aprime = MonomialBasis.formalDerivative(allocator, A),
+            .Aprime = Aprime,
             .Aprime_DOMAIN = Aprime_domain,
             .Aprime_DOMAIN_inv = Aprime_domain_inv,
             .domain = dom,
             .domain_inverses = inverses,
         };
+    }
+
+    pub fn deinit(self: *PrecomputedWeights) void {
+        self.A.deinit();
+        self.Aprime.deinit();
+        self.allocator.free(self.Aprime_DOMAIN);
+        self.allocator.free(self.Aprime_DOMAIN_inv);
+        self.allocator.free(self.domain);
+        self.allocator.free(self.domain_inverses);
     }
 
     // barycentricFormularConstants returns a slice with the constants to be used when evaluating a polynomial at z.
