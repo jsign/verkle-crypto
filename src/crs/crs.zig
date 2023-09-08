@@ -1,44 +1,34 @@
 const std = @import("std");
 const sha256 = std.crypto.hash.sha2.Sha256;
 const Allocator = std.mem.Allocator;
-const Bandersnatch = @import("../ecc/bandersnatch/bandersnatch.zig").Bandersnatch;
+const Bandersnatch = @import("../ecc/bandersnatch/bandersnatch.zig");
 const Fr = Bandersnatch.Fr;
 const Banderwagon = @import("../ecc/bandersnatch/banderwagon.zig").Banderwagon;
 
-const CRS = struct {
-    allocator: ?Allocator,
+pub const CRS = struct {
+    allocator: Allocator,
     BASIS_G: []Banderwagon,
     BASIS_Q: Banderwagon,
 
-    pub fn init(basisG: []Banderwagon) CRS {
-        return CRS{
-            .BASIS_G = basisG,
+    pub fn init(allocator: Allocator) !CRS {
+        return .{
+            .BASIS_G = try getCRS(allocator),
             .BASIS_Q = Banderwagon.generator(),
+            .allocator = allocator,
         };
     }
 
-    pub fn deinit(self: *CRS) void {
-        if (self.allocator) {
-            self.allocator.free(self.BASIS_G);
-            self.allocator = null;
-        }
+    pub fn deinit(self: *const CRS) void {
+        self.allocator.free(self.BASIS_G);
     }
 
     pub fn getItem(self: CRS, index: usize) Banderwagon {
         return self.BASIS_G[index];
     }
 
-    pub fn commit(self: *CRS, values: []Fr) Banderwagon {
+    pub fn commit(self: *const CRS, values: []Fr) Banderwagon {
         std.debug.assert(self.BASIS_G.len >= values.len);
         return Banderwagon.msm(self.BASIS_G[0..values.len], values);
-    }
-
-    pub fn default(allocator: Allocator) !CRS {
-        return .{
-            .BASIS_G = try getCRS(allocator),
-            .BASIS_Q = Banderwagon.generator(),
-            .allocator = allocator,
-        };
     }
 };
 
