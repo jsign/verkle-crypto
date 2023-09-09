@@ -62,7 +62,7 @@ pub fn challengeScalar(self: *Transcript, label: []const u8) Fr {
 // domainSep is used to:
 // - Separate between adding elements to the transcript and squeezing elements out
 // - Separate sub-protocols
-fn domainSep(self: *Transcript, label: []const u8) void {
+pub fn domainSep(self: *Transcript, label: []const u8) void {
     self.state.update(label);
 }
 
