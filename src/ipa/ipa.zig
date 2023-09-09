@@ -4,97 +4,125 @@ const Banderwagon = @import("../ecc/bandersnatch/banderwagon.zig").Banderwagon;
 const Fr = Bandersnatch.Fr;
 const PrecomputedWeights = @import("../polynomial/precomputed_weights.zig").PrecomputedWeights;
 const CRS = @import("../crs/crs.zig").CRS;
+const Transcript = @import("transcript.zig");
+const Common = @import("common.zig");
+const ArrayList = std.ArrayList;
+const Allocator = std.mem.Allocator;
+const assert = std.debug.assert;
 
-// @dataclass
-// class ProverQuery:
-//     polynomial: List[Fr]
+pub const ProverQuery = struct {
+    polynomial: []Fr,
+    commitment: Banderwagon,
+    // Input point
+    point: Fr,
+    // If polynomial was in monomial basis
+    // this would be <1, b, b^2, b^3, b^4,..., b^n>
+    // TODO: Can we give this a better name?
+    point_evaluations: []Fr,
+};
 
-//     commitment: Banderwagon
-//     # Input point
-//     point: Fr
-//     # If polynomial was in monomial basis
-//     # this would be <1, b, b^2, b^3, b^4,..., b^n>
-//     # TODO: Can we give this a better name?
-//     point_evaluations: List[Fr]
+pub const Proof = struct {
+    L: ArrayList(Banderwagon),
+    R: ArrayList(Banderwagon),
+    a: Fr,
 
-// @dataclass
-// class Proof:
-//     L: List[Banderwagon]
-//     R: List[Banderwagon]
-//     a: Fr
+    pub fn deinit(self: *Proof) void {
+        self.L.deinit();
+        self.R.deinit();
+    }
+};
 
-// @dataclass
-// class VerifierQuery:
-//     commitment: Banderwagon
+pub const VerifierQuery = struct {
+    commitment: Banderwagon,
+    point: Fr,
+    // If polynomial was in monomial basis
+    // this would be <1, b, b^2, b^3, b^4,..., b^n>
+    point_evaluations: []Fr,
+    output_point: Fr,
+    proof: Proof,
+};
 
-//     point: Fr
-//     # If polynomial was in monomial basis
-//     # this would be <1, b, b^2, b^3, b^4,..., b^n>
-//     point_evaluations: List[Fr]
+// Proves that <a, b> = inner_product
+// <a,b> is read as a inner product with b
+// Furthermore, b is assumed to be public, hence we will not commit to it
+//
+// The caller is responsible for calling deinit() in the returned proof.
+pub fn make_ipa_proof(allocator: Allocator, crs: CRS, transcript: *Transcript, query: ProverQuery) !struct { result: Fr, proof: Proof } {
+    transcript.domainSep("ipa");
 
-//     output_point: Fr
-//     # TODO: change this from typing.Any
-//     proof: Proof
+    var n = query.polynomial.len;
+    var m = n / 2;
 
-// # Proves that <a, b> = inner_product
-// # <a,b> is read as a inner product with b
-// # Furthermore, b is assumed to be public, hence we will not commit to it
-// def make_ipa_proof(crs: CRS, transcript: Transcript, query: ProverQuery):
-//     transcript.domain_sep(b"ipa")
+    var a = query.polynomial;
+    var b = query.point_evaluations;
+    assert(a.len == b.len);
+    // TODO(jsign): some extra assertions woudn't hurt here.
 
-//     n = len(query.polynomial)
-//     m = n // 2
+    const y = Common.innerProduct(a, b);
 
-//     a = query.polynomial
-//     b = query.point_evaluations
-//     y = inner_product(a, b)
+    var proof = Proof{
+        .L = try ArrayList(Banderwagon).initCapacity(allocator, n),
+        .R = try ArrayList(Banderwagon).initCapacity(allocator, n),
+        .a = Fr.zero(),
+    };
 
-//     proof = Proof([], [], Fr.zero())
+    transcript.appendPoint(query.commitment, "C");
+    transcript.appendScalar(query.point, "input point");
+    transcript.appendScalar(y, "output point");
+    const w = transcript.challengeScalar("w");
 
-//     transcript.append_point(query.commitment, b"C")
-//     transcript.append_scalar(query.point, b"input point")
-//     transcript.append_scalar(y, b"output point")
-//     w = transcript.challenge_scalar(b"w")
+    const q = crs.BASIS_Q.scalarMul(w);
 
-//     q = crs.BASIS_Q * w
+    var current_basis = crs.BASIS_G;
 
-//     current_basis = crs.BASIS_G
+    while (n > 1) {
+        // Reduction step
 
-//     while n > 1:
-//         # Reduction step
+        const a_L = a[0..m];
+        const a_R = a[m..];
+        const b_L = b[0..m];
+        const b_R = b[m..];
+        const z_L = Common.innerProduct(a_R, b_L);
+        const z_R = Common.innerProduct(a_L, b_R);
 
-//         a_L = a[:m]
-//         a_R = a[m:]
-//         b_L = b[:m]
-//         b_R = b[m:]
-//         z_L = inner_product(a_R, b_L)
-//         z_R = inner_product(a_L, b_R)
+        var C_L: Banderwagon = undefined;
+        var C_R: Banderwagon = undefined;
+        C_L.add(&Banderwagon.msm(current_basis[0..m], a_R), &q.scalarMul(z_L));
+        C_R.add(&Banderwagon.msm(current_basis[m..], a_L), &q.scalarMul(z_R));
 
-//         C_L: Banderwagon = varbase_commit(a_R, current_basis[:m]) + (q * z_L)
-//         C_R: Banderwagon = varbase_commit(a_L, current_basis[m:]) + (q * z_R)
+        try proof.L.append(C_L);
+        try proof.R.append(C_R);
 
-//         proof.L.append(C_L)
-//         proof.R.append(C_R)
+        transcript.appendPoint(C_L, "L");
+        transcript.appendPoint(C_R, "R");
+        const x = transcript.challengeScalar("x");
 
-//         transcript.append_point(C_L, b"L")
-//         transcript.append_point(C_R, b"R")
-//         x = transcript.challenge_scalar(b"x")
+        var xinv: Fr = x.inv().?;
 
-//         xinv = Fr.zero()
-//         xinv.inv(x)
+        // Compute updates for next round
+        for (a_L, a_R, 0..) |v, z, i| {
+            a[i] = v.add(x.mul(z));
+        }
+        a = a[0..m];
 
-//         # Compute updates for next round
-//         a = [(v + x * w) for v, w in zip(a_L, a_R)]
-//         b = [(v + xinv * w) for v, w in zip(b_L, b_R)]
+        for (b_L, b_R, 0..) |v, z, i| {
+            b[i] = v.add(xinv.mul(z));
+        }
+        b = b[0..m];
 
-//         current_basis = [v + (w * xinv)
-//                          for v, w in zip(current_basis[:m], current_basis[m:])]
-//         n = m
-//         m = n // 2
+        for (current_basis[0..m], current_basis[m..], 0..) |*v, *z, i| {
+            current_basis[i].add(v, &z.scalarMul(xinv));
+        }
+        current_basis = current_basis[0..m];
 
-//     proof.a = a[0]
+        n = m;
+        m = n / 2;
+    }
 
-//     return y, proof
+    proof.a = a[0];
+
+    return .{ .result = y, .proof = proof };
+}
 
 // def check_ipa_proof(crs: CRS, transcript: Transcript, query: VerifierQuery):
 //     transcript.domain_sep(b"ipa")
@@ -220,20 +248,31 @@ test "basic proof" {
     const expected_comm = std.fmt.bytesToHex(commitment.toBytes(), std.fmt.Case.lower);
     try std.testing.expectEqualStrings("1b9dff8f5ebbac250d291dfe90e36283a227c64b113c37f1bfb9e7a743cdb128", &expected_comm);
 
-    //         prover_transcript = Transcript(b"test")
+    var prover_transcript = Transcript.init("test");
 
-    //         # create a opening proof for a point outside of the domain
-    //         input_point = Fr(2101)
-    //         b = weights.barycentric_formula_constants(input_point)
-    //         query = ProverQuery(lagrange_poly, commitment, input_point, b)
+    // create a opening proof for a point outside of the domain
+    const input_point = Fr.fromInteger(2101);
+    const b = try weights.barycentricFormulaConstants(testAllocator, input_point);
+    defer testAllocator.free(b);
+    const output_point_check = Common.innerProduct(lagrange_poly, b);
+    const output_point_check_hex = std.fmt.bytesToHex(output_point_check.toBytes(), std.fmt.Case.lower);
+    try std.testing.expectEqualStrings("4a353e70b03c89f161de002e8713beec0d740a5e20722fd5bd68b30540a33208", &output_point_check_hex);
 
-    //         output_point, proof = make_ipa_proof(crs, prover_transcript, query)
+    var query = ProverQuery{
+        .polynomial = lagrange_poly,
+        .commitment = commitment,
+        .point = input_point,
+        .point_evaluations = b,
+    };
 
-    //         # # Lets check the state of the transcript by squeezing out another challenge
-    //         p_challenge = prover_transcript.challenge_scalar(b"state")
+    var ipa_proof = try make_ipa_proof(testAllocator, crs, &prover_transcript, query);
+    defer ipa_proof.proof.deinit();
 
-    //         self.assertEqual(
-    //             "0a81881cbfd7d7197a54ebd67ed6a68b5867f3c783706675b34ece43e85e7306", p_challenge.to_bytes().hex())
+    // Lets check the state of the transcript by squeezing out another challenge
+    const p_challenge = prover_transcript.challengeScalar("state");
+
+    const p_challenge_hex = std.fmt.bytesToHex(p_challenge.toBytes(), std.fmt.Case.lower);
+    try std.testing.expectEqualStrings("0a81881cbfd7d7197a54ebd67ed6a68b5867f3c783706675b34ece43e85e7306", &p_challenge_hex);
 
     //         verifier_transcript = Transcript(b"test")
 
