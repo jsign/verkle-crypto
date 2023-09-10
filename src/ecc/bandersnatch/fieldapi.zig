@@ -1,4 +1,5 @@
 const std = @import("std");
+const builtin = @import("builtin");
 const ArrayList = std.ArrayList;
 
 pub const Fp = BandersnatchField(@import("gen_fp.zig"), 52435875175126190479447740508185965837690552500527637822603658699938581184513);
@@ -48,14 +49,15 @@ fn BandersnatchField(comptime F: type, comptime mod: u256) type {
             return oneValue;
         }
 
-        pub fn fromBytes(bytes: [BYTE_LEN]u8) Self {
-            std.debug.assert(bytes.len == BYTE_LEN);
-            var dret: F.NonMontgomeryDomainFieldElement = undefined;
-            F.fromBytes(&dret, bytes);
+        pub fn from_bytes(bytes: [BYTE_LEN]u8) Self {
+            var non_mont: F.NonMontgomeryDomainFieldElement = undefined;
+            inline for (0..4) |i| {
+                non_mont[i] = std.mem.readIntSlice(u64, bytes[i * 8 .. (i + 1) * 8], std.builtin.Endian.Little);
+            }
+            var ret: Self = undefined;
+            F.toMontgomery(&ret.fe, non_mont);
 
-            var ret: F.MontgomeryDomainFieldElement = undefined;
-            F.toMontgomery(&ret, dret);
-            return Self{ .fe = ret };
+            return ret;
         }
 
         pub fn toBytes(self: Self) [BYTE_LEN]u8 {
@@ -327,7 +329,7 @@ test "from and to bytes" {
 
     for (cases) |fe| {
         const bytes = fe.toBytes();
-        const fe2 = Fp.fromBytes(bytes);
+        const fe2 = Fp.from_bytes(bytes);
         try std.testing.expect(fe.eq(fe2));
 
         const bytes2 = fe2.toBytes();

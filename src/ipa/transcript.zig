@@ -17,7 +17,7 @@ pub fn init(label: []const u8) Transcript {
 }
 // Convert bytes to scalar field
 fn bytesToField(bytes: [Fr.BYTE_LEN]u8) Fr {
-    return Fr.fromBytes(bytes);
+    return Fr.from_bytes(bytes);
 }
 
 fn appendBytes(self: *Transcript, message: []const u8, label: []const u8) void {

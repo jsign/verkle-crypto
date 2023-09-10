@@ -23,7 +23,7 @@ pub const Banderwagon = struct {
         std.mem.reverse(u8, &bytes_le);
 
         // TODO(jsign): Should -> "Will error if the bytes are not canonical"
-        const x = Fp.fromBytes(bytes_le);
+        const x = Fp.from_bytes(bytes_le);
 
         // Will error if the point is not on the curve
         const y = try AffinePoint.getYCoordinate(x, true);
