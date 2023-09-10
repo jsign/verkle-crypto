@@ -195,8 +195,8 @@ test "serialize smoke" {
         const expected_point = points.items[i];
 
         var byts: [32]u8 = undefined;
-        const hbyts = try std.fmt.hexToBytes(&byts, bit_string);
-        const decoded_point = try Banderwagon.fromBytes(@ptrCast(*[32]u8, hbyts.ptr).*);
+        _ = try std.fmt.hexToBytes(&byts, bit_string);
+        const decoded_point = try Banderwagon.fromBytes(byts);
         try std.testing.expect(decoded_point.eq(&expected_point));
     }
 }

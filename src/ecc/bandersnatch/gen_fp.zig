@@ -26,9 +26,9 @@ inline fn cast(comptime DestType: type, target: anytype) DestType {
         const dest = @typeInfo(DestType).Int;
         const source = @typeInfo(@TypeOf(target)).Int;
         if (dest.bits < source.bits) {
-            return @bitCast(DestType, @truncate(std.meta.Int(source.signedness, dest.bits), target));
+            return @bitCast(@as(std.meta.Int(source.signedness, dest.bits), @truncate(target)));
         } else {
-            return @bitCast(DestType, @as(std.meta.Int(source.signedness, dest.bits), target));
+            return @bitCast(@as(std.meta.Int(source.signedness, dest.bits), target));
         }
     }
     return @as(DestType, target);

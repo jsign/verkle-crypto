@@ -161,7 +161,7 @@ fn BandersnatchField(comptime F: type, comptime mod: u256) type {
                 t = t + MODULO;
             }
 
-            return Self.fromInteger(@intCast(u256, t));
+            return Self.fromInteger(@intCast(t));
         }
 
         pub fn div(self: Self, den: Self) !Self {

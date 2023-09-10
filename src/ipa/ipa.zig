@@ -124,7 +124,11 @@ pub fn make_ipa_proof(allocator: Allocator, crs: CRS, transcript: *Transcript, q
     return .{ .result = y, .proof = proof };
 }
 
-pub fn check_ipa_proof(allocator: Allocator, crs: *const CRS, transcript: *Transcript, query: *const VerifierQuery) !bool {
+pub fn check_ipa_proof(base_allocator: Allocator, crs: *const CRS, transcript: *Transcript, query: *const VerifierQuery) !bool {
+    var arena = std.heap.ArenaAllocator.init(base_allocator);
+    defer arena.deinit();
+    var allocator = arena.allocator();
+
     transcript.domainSep("ipa");
     // TODO: We should add `n` into the transcript.
     // TODO: this breaks compatibility, with other implementations
@@ -226,26 +230,31 @@ fn split_list_in_half(comptime T: type, x: []const T) struct { L: []const T, R: 
     return .{ .L = x[0..mid], .R = x[mid..] };
 }
 
-const testAllocator = std.testing.allocator;
+const test_allocator = std.testing.allocator;
 test "basic proof" {
+    // TODO: use base allocator.
+    var arena = std.heap.ArenaAllocator.init(test_allocator);
+    defer arena.deinit();
+    var allocator = arena.allocator();
+
     // Test a simple IPA proof
-    var domain = try testAllocator.alloc(Fr, 256);
-    defer testAllocator.free(domain);
+    var domain = try allocator.alloc(Fr, 256);
+    defer allocator.free(domain);
     for (0..256) |i| {
         domain[i] = Fr.fromInteger(i);
     }
-    var weights = try PrecomputedWeights.init(testAllocator, domain);
+    var weights = try PrecomputedWeights.init(allocator, domain);
     defer weights.deinit();
 
     // Polynomial in lagrange basis
-    var lagrange_poly = try testAllocator.alloc(Fr, 256);
-    defer testAllocator.free(lagrange_poly);
+    var lagrange_poly = try allocator.alloc(Fr, 256);
+    defer allocator.free(lagrange_poly);
     for (0..256) |i| {
         lagrange_poly[i] = Fr.fromInteger(i % 32 + 1);
     }
 
     // Commit to the polynomial in lagrange basis
-    const crs = try CRS.init(testAllocator);
+    const crs = try CRS.init(allocator);
     defer crs.deinit();
     const commitment = crs.commit(lagrange_poly);
 
@@ -256,8 +265,8 @@ test "basic proof" {
 
     // create a opening proof for a point outside of the domain
     const input_point = Fr.fromInteger(2101);
-    var b = try weights.barycentricFormulaConstants(testAllocator, input_point);
-    defer testAllocator.free(b);
+    var b = try weights.barycentricFormulaConstants(allocator, input_point);
+    defer allocator.free(b);
     const output_point_check = Common.innerProduct(lagrange_poly, b);
     const output_point_check_hex = std.fmt.bytesToHex(output_point_check.toBytes(), std.fmt.Case.lower);
     try std.testing.expectEqualStrings("4a353e70b03c89f161de002e8713beec0d740a5e20722fd5bd68b30540a33208", &output_point_check_hex);
@@ -269,7 +278,7 @@ test "basic proof" {
         .point_evaluations = b,
     };
 
-    var ipa_proof = try make_ipa_proof(testAllocator, crs, &prover_transcript, &query);
+    var ipa_proof = try make_ipa_proof(allocator, crs, &prover_transcript, &query);
     defer ipa_proof.proof.deinit();
 
     // Lets check the state of the transcript by squeezing out another challenge
@@ -279,8 +288,8 @@ test "basic proof" {
 
     // Verify the proof.
     var verifier_transcript = Transcript.init("test");
-    const b_verifier = try weights.barycentricFormulaConstants(testAllocator, input_point);
-    defer testAllocator.free(b_verifier);
+    const b_verifier = try weights.barycentricFormulaConstants(allocator, input_point);
+    defer allocator.free(b_verifier);
     const verifier_query = VerifierQuery{
         .commitment = commitment,
         .point = input_point,
@@ -288,6 +297,6 @@ test "basic proof" {
         .output_point = ipa_proof.result,
         .proof = ipa_proof.proof,
     };
-    const ok = try check_ipa_proof(testAllocator, &crs, &verifier_transcript, &verifier_query);
+    const ok = try check_ipa_proof(allocator, &crs, &verifier_transcript, &verifier_query);
     try std.testing.expect(ok);
 }

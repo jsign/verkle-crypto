@@ -126,7 +126,7 @@ pub const ExtendedPoint = struct {
         const scalar = scalarMont.toInteger();
         const one: @TypeOf(scalar) = 1;
         inline for (0..@bitSizeOf(@TypeOf(scalar))) |i| {
-            if (scalar & (one << @intCast(u8, i)) > 0) {
+            if (scalar & (one << @intCast(i)) > 0) {
                 result = result.add(temp);
             }
             temp = temp.double();

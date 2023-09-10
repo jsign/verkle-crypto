@@ -301,9 +301,9 @@ fn getCRS(allocator: Allocator) ![]Banderwagon {
     var points = try allocator.alloc(Banderwagon, CRS_CONSTANTS.len);
     for (CRS_CONSTANTS, 0..) |g_bytes, i| {
         var g_be_bytes: [32]u8 = undefined;
-        const gbytes = try std.fmt.hexToBytes(&g_be_bytes, g_bytes);
+        _ = try std.fmt.hexToBytes(&g_be_bytes, g_bytes);
         // TODO(jsign): change fromBytes API to slice.
-        const point = try Banderwagon.fromBytes(@ptrCast(*[32]u8, gbytes.ptr).*);
+        const point = try Banderwagon.fromBytes(g_be_bytes);
         points[i] = point;
     }
     return points;
