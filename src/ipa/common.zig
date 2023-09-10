@@ -4,7 +4,7 @@ const Fr = Bandersnatch.Fr;
 
 // TODO: Methods here may be moved into different modules in the future
 
-pub fn innerProduct(a: []Fr, b: []Fr) Fr {
+pub fn innerProduct(a: []const Fr, b: []const Fr) Fr {
     var result = Fr.zero();
     for (a, b) |ai, bi| {
         const term = ai.mul(bi);

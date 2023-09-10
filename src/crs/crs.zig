@@ -7,7 +7,7 @@ const Banderwagon = @import("../ecc/bandersnatch/banderwagon.zig").Banderwagon;
 
 pub const CRS = struct {
     allocator: Allocator,
-    BASIS_G: []Banderwagon,
+    BASIS_G: []const Banderwagon,
     BASIS_Q: Banderwagon,
 
     pub fn init(allocator: Allocator) !CRS {

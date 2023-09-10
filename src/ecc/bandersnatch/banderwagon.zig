@@ -145,7 +145,7 @@ pub const Banderwagon = struct {
     }
 
     // Multi scalar multiplication
-    pub fn msm(points: []Banderwagon, scalars: []Fr) Banderwagon {
+    pub fn msm(points: []const Banderwagon, scalars: []const Fr) Banderwagon {
         var res = Banderwagon.identity();
 
         for (scalars, points) |scalar, point| {

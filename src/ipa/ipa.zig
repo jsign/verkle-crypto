@@ -47,7 +47,7 @@ pub const VerifierQuery = struct {
 // Furthermore, b is assumed to be public, hence we will not commit to it
 //
 // The caller is responsible for calling deinit() in the returned proof.
-pub fn make_ipa_proof(allocator: Allocator, crs: CRS, transcript: *Transcript, query: ProverQuery) !struct { result: Fr, proof: Proof } {
+pub fn make_ipa_proof(allocator: Allocator, crs: CRS, transcript: *Transcript, query: *ProverQuery) !struct { result: Fr, proof: Proof } {
     transcript.domainSep("ipa");
 
     var n = query.polynomial.len;
@@ -73,7 +73,7 @@ pub fn make_ipa_proof(allocator: Allocator, crs: CRS, transcript: *Transcript, q
 
     const q = crs.BASIS_Q.scalarMul(w);
 
-    var current_basis = crs.BASIS_G;
+    var current_basis = try allocator.dupe(Banderwagon, crs.BASIS_G);
 
     while (n > 1) {
         // Reduction step
@@ -124,103 +124,107 @@ pub fn make_ipa_proof(allocator: Allocator, crs: CRS, transcript: *Transcript, q
     return .{ .result = y, .proof = proof };
 }
 
-// def check_ipa_proof(crs: CRS, transcript: Transcript, query: VerifierQuery):
-//     transcript.domain_sep(b"ipa")
-//     # TODO: We should add `n` into the transcript.
-//     # TODO: this breaks compatibility, with other implementations
-//     # TODO: so lets wait until reference is completed
-//     n = len(query.point_evaluations)
-//     m = n // 2
+pub fn check_ipa_proof(allocator: Allocator, crs: *const CRS, transcript: *Transcript, query: *const VerifierQuery) !bool {
+    transcript.domainSep("ipa");
+    // TODO: We should add `n` into the transcript.
+    // TODO: this breaks compatibility, with other implementations
+    // TODO: so lets wait until reference is completed
+    var n = query.point_evaluations.len;
+    var m = n / 2;
 
-//     C = query.commitment
-//     z = query.point
-//     b = query.point_evaluations
-//     proof = query.proof
-//     y = query.output_point
+    const C = query.commitment;
+    const z = query.point;
+    var b = query.point_evaluations;
+    const proof = query.proof;
+    const y = query.output_point;
 
-//     transcript.append_point(C, b"C")
-//     transcript.append_scalar(z, b"input point")
-//     transcript.append_scalar(y, b"output point")
-//     w = transcript.challenge_scalar(b"w")
+    transcript.appendPoint(C, "C");
+    transcript.appendScalar(z, "input point");
+    transcript.appendScalar(y, "output point");
+    const w = transcript.challengeScalar("w");
 
-//     q = crs.BASIS_Q * w
+    const q = crs.BASIS_Q.scalarMul(w);
 
-//     current_commitment = C + (q * y)
+    var current_commitment: Banderwagon = undefined;
+    current_commitment.add(&C, &q.scalarMul(y));
 
-//     i = 0
-//     xs = []
-//     xinvs = []
+    var i: u8 = 0;
+    var xs = ArrayList(Fr).init(allocator);
+    var xinvs = ArrayList(Fr).init(allocator);
 
-//     while n > 1:
-//         C_L = proof.L[i]
-//         C_R = proof.R[i]
-//         transcript.append_point(C_L, b"L")
-//         transcript.append_point(C_R, b"R")
-//         x = transcript.challenge_scalar(b"x")
+    while (n > 1) {
+        const C_L = proof.L.items[i];
+        const C_R = proof.R.items[i];
+        transcript.appendPoint(C_L, "L");
+        transcript.appendPoint(C_R, "R");
 
-//         x_inv = Fr.zero()
-//         xinv = x_inv.inv(x)
+        const x = transcript.challengeScalar("x");
+        const x_inv = x.inv().?;
 
-//         xs.append(x)
-//         xinvs.append(xinv)
+        try xs.append(x);
+        try xinvs.append(x_inv);
 
-//         current_commitment = current_commitment + (C_L * x) + (C_R * xinv)
+        var tmp: Banderwagon = undefined;
+        tmp.add(&C_L.scalarMul(x), &C_R.scalarMul(x_inv));
+        current_commitment.add(&current_commitment, &tmp);
 
-//         n = m
-//         m = n // 2
-//         i = i + 1
+        n = m;
+        m = n / 2;
+        i = i + 1;
+    }
 
-//     # Do it the inefficient way
-//     current_basis = crs.BASIS_G
+    // Do it the inefficient way (TODO: optimize)
+    var current_basis = crs.BASIS_G;
 
-//     for i in range(len(xs)):
+    for (0..xs.items.len) |j| {
+        const g_split = split_list_in_half(Banderwagon, current_basis);
+        const b_split = split_list_in_half(Fr, b);
 
-//         G_L, G_R = split_points(current_basis)
-//         b_L, b_R = split_scalars(b)
+        const x_inv = xinvs.items[j];
 
-//         x_inv = xinvs[i]
+        b = try fold_scalars(allocator, b_split.L, b_split.R, x_inv);
+        current_basis = try fold_points(allocator, g_split.L, g_split.R, x_inv);
+    }
 
-//         b = fold_scalars(b_L, b_R, x_inv)
-//         current_basis = fold_points(G_L, G_R, x_inv)
+    assert(b.len == current_basis.len);
+    assert(b.len == 1);
 
-//     assert len(b) == len(current_basis)
-//     assert len(b) == 1
+    const b_0 = b[0];
+    const G_0 = current_basis[0];
 
-//     b_0 = b[0]
-//     G_0 = current_basis[0]
+    // G[0] * a + (a * b) * Q;
+    var got_commitment: Banderwagon = undefined;
+    got_commitment.add(&G_0.scalarMul(proof.a), &q.scalarMul(Fr.mul(proof.a, b_0)));
 
-//     # G[0] * a + (a * b) * Q;
-//     got_commitment = G_0 * proof.a + q * (proof.a * b_0)
+    return current_commitment.eq(&got_commitment);
+}
 
-//     return current_commitment == got_commitment
+// Computes c[i] = a[i] + b[i] * challenge
+fn fold_scalars(allocator: Allocator, a: []const Fr, b: []const Fr, folding_challenge: Fr) ![]Fr {
+    assert(a.len == b.len);
+    var result = try allocator.alloc(Fr, a.len);
+    for (a, b, 0..) |a_i, b_i, i| {
+        result[i] = a_i.add(b_i.mul(folding_challenge));
+    }
+    return result;
+}
 
-// # Computes c[i] = a[i] + b[i] * challenge
-// def fold_list(a, b, folding_challenge: Fr):
-//     assert len(a) == len(b)
-//     result = []
-//     for a_i, b_i in zip(a, b):
-//         result.append(a_i + b_i * folding_challenge)
-//     return result
+fn fold_points(allocator: Allocator, a: []const Banderwagon, b: []const Banderwagon, folding_challenge: Fr) ![]Banderwagon {
+    assert(a.len == b.len);
+    var result = try allocator.alloc(Banderwagon, a.len);
+    for (a, b, 0..) |a_i, b_i, i| {
+        result[i].add(&a_i, &b_i.scalarMul(folding_challenge));
+    }
+    return result;
+}
 
-// def fold_points(a: List[Banderwagon], b: List[Banderwagon], folding_challenge: Fr):
-//     return fold_list(a, b, folding_challenge)
-
-// def fold_scalars(a: List[Fr], b: List[Fr], folding_challenge: Fr):
-//     return fold_list(a, b, folding_challenge)
-
-// #  Splits a list into two lists of equal length
-// #  Eg[S1, S2, S3, S4] becomes[S1, S2], [S3, S4]
-// def split_list_in_half(x):
-//     assert len(x) % 2 == 0
-
-//     mid = len(x) // 2
-//     return (x[:mid], x[mid:])
-
-// def split_scalars(x: List[Fr]):
-//     return split_list_in_half(x)
-
-// def split_points(x: List[Banderwagon]):
-//     return split_list_in_half(x)
+// Splits a list into two lists of equal length
+// Eg[S1, S2, S3, S4] becomes[S1, S2], [S3, S4]
+fn split_list_in_half(comptime T: type, x: []const T) struct { L: []const T, R: []const T } {
+    assert(x.len % 2 == 0);
+    const mid = x.len / 2;
+    return .{ .L = x[0..mid], .R = x[mid..] };
+}
 
 const testAllocator = std.testing.allocator;
 test "basic proof" {
@@ -252,7 +256,7 @@ test "basic proof" {
 
     // create a opening proof for a point outside of the domain
     const input_point = Fr.fromInteger(2101);
-    const b = try weights.barycentricFormulaConstants(testAllocator, input_point);
+    var b = try weights.barycentricFormulaConstants(testAllocator, input_point);
     defer testAllocator.free(b);
     const output_point_check = Common.innerProduct(lagrange_poly, b);
     const output_point_check_hex = std.fmt.bytesToHex(output_point_check.toBytes(), std.fmt.Case.lower);
@@ -265,20 +269,25 @@ test "basic proof" {
         .point_evaluations = b,
     };
 
-    var ipa_proof = try make_ipa_proof(testAllocator, crs, &prover_transcript, query);
+    var ipa_proof = try make_ipa_proof(testAllocator, crs, &prover_transcript, &query);
     defer ipa_proof.proof.deinit();
 
     // Lets check the state of the transcript by squeezing out another challenge
     const p_challenge = prover_transcript.challengeScalar("state");
-
     const p_challenge_hex = std.fmt.bytesToHex(p_challenge.toBytes(), std.fmt.Case.lower);
     try std.testing.expectEqualStrings("0a81881cbfd7d7197a54ebd67ed6a68b5867f3c783706675b34ece43e85e7306", &p_challenge_hex);
 
-    //         verifier_transcript = Transcript(b"test")
-
-    //         query = VerifierQuery(commitment, input_point, b, output_point, proof)
-
-    //         ok = check_ipa_proof(crs, verifier_transcript, query)
-
-    //         self.assertTrue(ok)
+    // Verify the proof.
+    var verifier_transcript = Transcript.init("test");
+    const b_verifier = try weights.barycentricFormulaConstants(testAllocator, input_point);
+    defer testAllocator.free(b_verifier);
+    const verifier_query = VerifierQuery{
+        .commitment = commitment,
+        .point = input_point,
+        .point_evaluations = b_verifier,
+        .output_point = ipa_proof.result,
+        .proof = ipa_proof.proof,
+    };
+    const ok = try check_ipa_proof(testAllocator, &crs, &verifier_transcript, &verifier_query);
+    try std.testing.expect(ok);
 }
