@@ -52,7 +52,7 @@ test "neg" {
 
 test "serialize gen" {
     const gen = ExtendedPoint.generator();
-    const serialised_point = gen.toBytes();
+    const serialised_point = gen.to_bytes();
 
     // test vector taken from the rust code (see spec reference)
     const expected = "18ae52a26618e7e1658499ad22c0792bf342be7b77113774c5340b2ccc32c129";
@@ -80,6 +80,6 @@ test "scalar mul minus one" {
     const result = gen.scalarMul(scalar);
 
     const expected = "e951ad5d98e7181e99d76452e0e343281295e38d90c602bf824892fd86742c4a";
-    const actual = std.fmt.bytesToHex(result.toBytes(), std.fmt.Case.lower);
+    const actual = std.fmt.bytesToHex(result.to_bytes(), std.fmt.Case.lower);
     try std.testing.expectEqualSlices(u8, expected, &actual);
 }

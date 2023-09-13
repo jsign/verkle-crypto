@@ -318,14 +318,14 @@ test "crs is consistent" {
     try std.testing.expect(crs.len == CRS_CONSTANTS.len);
 
     for (crs, 0..) |g, i| {
-        const got_point = std.fmt.bytesToHex(g.toBytes(), std.fmt.Case.lower);
+        const got_point = std.fmt.bytesToHex(g.to_bytes(), std.fmt.Case.lower);
         const expected_point = CRS_CONSTANTS[i];
         try std.testing.expect(std.mem.eql(u8, &got_point, expected_point));
     }
 
     var hasher = sha256.init(.{});
     for (crs) |point| {
-        hasher.update(&point.toBytes());
+        hasher.update(&point.to_bytes());
     }
     const result = hasher.finalResult();
     const result_hex = std.fmt.bytesToHex(result, std.fmt.Case.lower);

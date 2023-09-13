@@ -149,7 +149,7 @@ pub const ExtendedPoint = struct {
     }
 
     // # Only used for testing purposes.
-    pub fn toBytes(self: ExtendedPoint) [32]u8 {
-        return self.toAffine().toBytes();
+    pub fn to_bytes(self: ExtendedPoint) [32]u8 {
+        return self.toAffine().to_bytes();
     }
 };

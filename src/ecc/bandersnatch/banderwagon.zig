@@ -99,7 +99,7 @@ pub const Banderwagon = struct {
         return res.legendre();
     }
 
-    pub fn toBytes(self: Banderwagon) [32]u8 {
+    pub fn to_bytes(self: Banderwagon) [32]u8 {
         const affine = self.point.toAffine();
         var x = affine.x;
         if (!affine.y.lexographicallyLargest()) {
@@ -107,7 +107,7 @@ pub const Banderwagon = struct {
         }
 
         // Little endian.
-        var bytes = x.toBytes();
+        var bytes = x.to_bytes();
         // Big endian.
         std.mem.reverse(u8, &bytes);
 
@@ -183,7 +183,7 @@ test "serialize smoke" {
 
     // Check that encoding algorithm gives expected results
     for (expected_bit_strings) |bit_string| {
-        const byts = std.fmt.bytesToHex(point.toBytes(), std.fmt.Case.lower);
+        const byts = std.fmt.bytesToHex(point.to_bytes(), std.fmt.Case.lower);
         try std.testing.expectEqualSlices(u8, bit_string, &byts);
 
         points.appendAssumeCapacity(point);

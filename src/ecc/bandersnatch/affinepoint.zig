@@ -96,7 +96,7 @@ pub const AffinePoint = struct {
         return result;
     }
 
-    pub fn toBytes(self: AffinePoint) [32]u8 {
+    pub fn to_bytes(self: AffinePoint) [32]u8 {
         const mCompressedNegative = 0x80;
         const mCompressedPositive = 0x00;
 
@@ -105,7 +105,7 @@ pub const AffinePoint = struct {
             mask = mCompressedNegative;
         }
 
-        var xBytes = self.x.toBytes();
+        var xBytes = self.x.to_bytes();
         xBytes[31] |= mask;
 
         return xBytes;

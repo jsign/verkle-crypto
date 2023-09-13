@@ -60,12 +60,14 @@ fn BandersnatchField(comptime F: type, comptime mod: u256) type {
             return ret;
         }
 
-        pub fn toBytes(self: Self) [BYTE_LEN]u8 {
-            var nonMont: F.NonMontgomeryDomainFieldElement = undefined;
-            F.fromMontgomery(&nonMont, self.fe);
-
+        pub fn to_bytes(self: Self) [BYTE_LEN]u8 {
+            var non_mont: F.NonMontgomeryDomainFieldElement = undefined;
+            F.fromMontgomery(&non_mont, self.fe);
             var ret: [BYTE_LEN]u8 = undefined;
-            F.toBytes(&ret, nonMont);
+            inline for (0..4) |i| {
+                std.mem.writeIntSlice(u64, ret[i * 8 .. (i + 1) * 8], non_mont[i], std.builtin.Endian.Little);
+            }
+
             return ret;
         }
 
@@ -328,11 +330,11 @@ test "from and to bytes" {
     const cases = [_]Fp{ Fp.fromInteger(0), Fp.fromInteger(1), Fp.fromInteger(Fp.Q_MIN_ONE_DIV_2), Fp.fromInteger(Fp.MODULO - 1) };
 
     for (cases) |fe| {
-        const bytes = fe.toBytes();
+        const bytes = fe.to_bytes();
         const fe2 = Fp.from_bytes(bytes);
         try std.testing.expect(fe.eq(fe2));
 
-        const bytes2 = fe2.toBytes();
+        const bytes2 = fe2.to_bytes();
         try std.testing.expectEqualSlices(u8, &bytes, &bytes2);
     }
 }
