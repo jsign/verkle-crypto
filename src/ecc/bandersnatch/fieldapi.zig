@@ -186,11 +186,11 @@ fn BandersnatchField(comptime F: type, comptime mod: u256) type {
         }
 
         pub inline fn toInteger(self: Self) u256 {
-            var nonMont: F.NonMontgomeryDomainFieldElement = undefined;
-            F.fromMontgomery(&nonMont, self.fe);
+            var non_mont: F.NonMontgomeryDomainFieldElement = undefined;
+            F.fromMontgomery(&non_mont, self.fe);
 
             var bytes: [BYTE_LEN]u8 = [_]u8{0} ** BYTE_LEN;
-            F.toBytes(&bytes, nonMont);
+            F.toBytes(&bytes, non_mont);
 
             return std.mem.readInt(u256, &bytes, std.builtin.Endian.Little);
         }
@@ -364,58 +364,9 @@ test "inv" {
         const one = T.one();
         const cases = [_]T{ T.fromInteger(2), T.fromInteger(42), T.fromInteger(T.MODULO - 1) };
         for (cases) |fe| {
-            std.debug.print("Calculating inverse of {}\n", .{T.toInteger(fe)});
-            const start = std.time.microTimestamp();
             try std.testing.expect(fe.mul(fe.inv().?).eq(one));
-            std.debug.print("Took {}ms\n", .{std.time.microTimestamp() - start});
-            const start2 = std.time.microTimestamp();
-            try std.testing.expect(fe.mul(inv2(fe)).eq(one));
-            std.debug.print("Took2 {}ms\n", .{std.time.microTimestamp() - start2});
         }
     }
-}
-
-pub fn inv2(self: Fp) Fp {
-    @setRuntimeSafety(false);
-    const _10 = Fp.mul(self, self);
-    const _11 = Fp.mul(self, _10);
-    const _100 = Fp.mul(self, _11);
-    const _110 = Fp.mul(_10, _100);
-    const _1100 = Fp.mul(_110, _110);
-    const _10010 = Fp.mul(_110, _1100);
-    const _10011 = Fp.mul(self, _10010);
-    const _10110 = Fp.mul(_11, _10011);
-    const _11000 = Fp.mul(_10, _10110);
-    const _11010 = Fp.mul(_10, _11000);
-    const _100010 = Fp.mul(_1100, _10110);
-    const _110101 = Fp.mul(_10011, _100010);
-    const _111011 = Fp.mul(_110, _110101);
-    const _1001011 = Fp.mul(_10110, _110101);
-    const _1001101 = Fp.mul(_10, _1001011);
-    const _1010101 = Fp.mul(_11010, _111011);
-    const _1100111 = Fp.mul(_10010, _1010101);
-    const _1101001 = Fp.mul(_10, _1100111);
-    const _10000011 = Fp.mul(_11010, _1101001);
-    const _10011001 = Fp.mul(_10110, _10000011);
-    const _10011101 = Fp.mul(_100, _10011001);
-    const _10111111 = Fp.mul(_100010, _10011101);
-    const _11010111 = Fp.mul(_11000, _10111111);
-    const _11011011 = Fp.mul(_100, _11010111);
-    const _11100111 = Fp.mul(_1100, _11011011);
-    const _11101111 = Fp.mul(_11000, _11010111);
-    const _11111111 = Fp.mul(_11000, _11100111);
-    const _i55 = Fp.pow2(Fp.mul(Fp.pow2(Fp.mul(Fp.pow2(_11100111, 8), _11011011), 9), _10011101), 9);
-    const _i75 = Fp.mul(Fp.pow2(Fp.mul(Fp.pow2(Fp.mul(_10011001, _i55), 9), _10011001), 8), _11010111);
-    const _i102 = Fp.pow2(Fp.mul(Fp.pow2(Fp.mul(Fp.pow2(_i75, 6), _110101), 10), _10000011), 9);
-    const _i121 = Fp.mul(Fp.pow2(Fp.mul(Fp.pow2(Fp.mul(_1100111, _i102), 8), _111011), 8), self);
-    const _i162 = Fp.pow2(Fp.mul(Fp.pow2(Fp.mul(Fp.pow2(_i121, 14), _1001101), 10), _111011), 15);
-    const _i183 = Fp.mul(Fp.pow2(Fp.mul(Fp.pow2(Fp.mul(_1010101, _i162), 10), _11101111), 8), _1101001);
-    const _i216 = Fp.pow2(Fp.mul(Fp.pow2(Fp.mul(Fp.pow2(_i183, 16), _10111111), 8), _11111111), 7);
-    const _i236 = Fp.mul(Fp.pow2(Fp.mul(Fp.pow2(Fp.mul(_1001011, _i216), 9), _11111111), 8), _10111111);
-    const _i262 = Fp.pow2(Fp.mul(Fp.pow2(Fp.mul(Fp.pow2(_i236, 8), _11111111), 8), _11111111), 8);
-    const _i281 = Fp.mul(Fp.pow2(Fp.mul(Fp.pow2(Fp.mul(_11111111, _i262), 8), _10111111), 8), _11111111);
-    const _i301 = Fp.pow2(Fp.mul(Fp.pow2(Fp.mul(Fp.pow2(_i281, 8), _11111111), 8), _11111111), 2);
-    return Fp.mul(_11, _i301);
 }
 
 test "sqrt" {

@@ -22,5 +22,7 @@ pub fn build(b: *std.Build) void {
         .optimize = optimize,
     });
     const test_step = b.step("test", "Run library tests");
-    test_step.dependOn(&b.addRunArtifact(main_tests).step);
+    const run_test = b.addRunArtifact(main_tests);
+    run_test.has_side_effects = true;
+    test_step.dependOn(&run_test.step);
 }
