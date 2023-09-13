@@ -72,9 +72,8 @@ pub const Banderwagon = struct {
         self.point = ExtendedPoint.add(p.point, q.point);
     }
 
-    pub fn sub(self: Banderwagon, p: Banderwagon, q: Banderwagon) Banderwagon {
-        self.point = p.point - q.point;
-        return self;
+    pub fn sub(self: *Banderwagon, p: Banderwagon, q: Banderwagon) void {
+        self.point = ExtendedPoint.sub(p.point, q.point);
     }
 
     pub fn mapToFieldBytes(self: Banderwagon) [32]u8 {

@@ -11,14 +11,14 @@ const Allocator = std.mem.Allocator;
 const assert = std.debug.assert;
 
 pub const ProverQuery = struct {
-    polynomial: []Fr,
+    polynomial: []const Fr,
     commitment: Banderwagon,
     // Input point
     point: Fr,
     // If polynomial was in monomial basis
     // this would be <1, b, b^2, b^3, b^4,..., b^n>
     // TODO: Can we give this a better name?
-    point_evaluations: []Fr,
+    point_evaluations: []const Fr,
 };
 
 pub const Proof = struct {
@@ -53,9 +53,13 @@ pub fn make_ipa_proof(allocator: Allocator, crs: CRS, transcript: *Transcript, q
     var n = query.polynomial.len;
     var m = n / 2;
 
-    var a = query.polynomial;
-    var b = query.point_evaluations;
-    assert(a.len == b.len);
+    assert(query.polynomial.len == query.point_evaluations.len);
+
+    var a = try allocator.dupe(Fr, query.polynomial);
+    defer allocator.free(a);
+    var b = try allocator.dupe(Fr, query.point_evaluations);
+    defer allocator.free(b);
+
     // TODO(jsign): some extra assertions woudn't hurt here.
 
     const y = Common.innerProduct(a, b);

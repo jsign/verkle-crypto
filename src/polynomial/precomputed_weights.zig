@@ -79,7 +79,7 @@ pub const PrecomputedWeights = struct {
     // barycentricFormularConstants returns a slice with the constants to be used when evaluating a polynomial at z.
     // b_i = A(z) / A'(DOMAIN[i]) * 1 / (z - DOMAIN[i])
     // The caller is responsible for freeing the returned slice.
-    pub fn barycentricFormulaConstants(self: *PrecomputedWeights, alloc: Allocator, z: Fr) ![]Fr {
+    pub fn barycentricFormulaConstants(self: PrecomputedWeights, alloc: Allocator, z: Fr) ![]Fr {
         const Az = self.A.evaluate(z);
 
         var inverses = try alloc.alloc(Fr, self.domain.len);

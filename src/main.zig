@@ -30,3 +30,7 @@ test "ipa" {
     _ = @import("ipa/ipa.zig");
     std.testing.refAllDeclsRecursive(@This());
 }
+
+test "multiproof" {
+    _ = @import("multiproof/multiproof.zig");
+}

@@ -26,7 +26,7 @@ pub const CRS = struct {
         return self.BASIS_G[index];
     }
 
-    pub fn commit(self: *const CRS, values: []Fr) Banderwagon {
+    pub fn commit(self: *const CRS, values: []const Fr) Banderwagon {
         std.debug.assert(self.BASIS_G.len >= values.len);
         return Banderwagon.msm(self.BASIS_G[0..values.len], values);
     }
