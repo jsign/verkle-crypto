@@ -5,7 +5,7 @@ const Banderwagon = banderwagon.Banderwagon;
 const Fr = banderwagon.Fr;
 const lagrange_basis = @import("../polynomial/lagrange_basis.zig");
 const Transcript = @import("../ipa/transcript.zig");
-const IPA = @import("../ipa/ipa.zig");
+const ipa = @import("../ipa/ipa.zig");
 const crs = @import("../crs/crs.zig");
 const CRS = crs.CRS;
 const precomputed_weights = @import("../polynomial/precomputed_weights.zig");
@@ -35,7 +35,8 @@ const VerifierQuery = struct {
 };
 
 const Proof = struct {
-    ipa: IPA.Proof,
+    // TODO
+    ipa: ipa.IPA(crs.DomainSize).IPAProof,
     D: Banderwagon,
 };
 
@@ -56,6 +57,10 @@ const MultiProof = struct {
         transcript: *Transcript,
         queries: []const ProverQuery,
     ) !Proof {
+        _ = allocator;
+        // TODO
+        const IPA = ipa.IPA(crs.DomainSize);
+
         transcript.domainSep("multiproof");
 
         // Add queries into transcript
@@ -81,7 +86,7 @@ const MultiProof = struct {
             power_of_r = Fr.mul(power_of_r, r);
         }
 
-        const D = self.crs.commit(&g);
+        const D = CRS.commit(self.crs, g);
         transcript.appendPoint(D, "D");
 
         // Step 2: Compute h in evaluation form
@@ -112,7 +117,7 @@ const MultiProof = struct {
 
         // Step 3: Evaluate and compute IPA proofs
 
-        const E = self.crs.commit(&h);
+        const E = CRS.commit(self.crs, h);
         transcript.appendPoint(E, "E");
 
         var ipa_commitment: Banderwagon = undefined;
@@ -123,14 +128,12 @@ const MultiProof = struct {
         const input_point_vector = self.precomp.barycentricFormulaConstants(input_point);
 
         var query = IPA.ProverQuery{
-            .polynomial = &polynomial,
+            .polynomial = polynomial,
             .commitment = ipa_commitment,
             .point = input_point,
-            .point_evaluations = &input_point_vector,
+            .point_evaluations = input_point_vector,
         };
-
-        // TODO: simplify proof_res
-        const proof_res = try IPA.make_ipa_proof(allocator, self.crs, transcript, &query);
+        const proof_res = IPA.createProof(self.crs, transcript, query);
 
         return Proof{ .ipa = proof_res.proof, .D = D };
     }
@@ -142,6 +145,9 @@ const MultiProof = struct {
         queries: []const VerifierQuery,
         proof: Proof,
     ) !bool {
+        // TODO
+        const IPA = ipa.IPA(crs.DomainSize);
+
         transcript.domainSep("multiproof");
         const D = proof.D;
         const ipa_proof = proof.ipa;
@@ -191,11 +197,11 @@ const MultiProof = struct {
         const query = IPA.VerifierQuery{
             .commitment = ipa_commitment,
             .point = input_point,
-            .point_evaluations = &input_point_vector,
+            .point_evaluations = input_point_vector,
             .output_point = output_point,
             .proof = ipa_proof,
         };
-        return IPA.check_ipa_proof(allocator, self.crs, transcript, &query);
+        return IPA.verifyProof(self.crs, transcript, query);
     }
 
     pub fn compute_quotient_inside_domain(self: MultiProof, f: LagrangeBasis, index: Fr) !LagrangeBasis {
@@ -304,8 +310,8 @@ test "basic" {
     } ** 8;
 
     const vkt_crs = CRS.init();
-    const C_a = vkt_crs.commit(&poly_eval_a);
-    const C_b = vkt_crs.commit(&poly_eval_b);
+    const C_a = CRS.commit(vkt_crs, poly_eval_a);
+    const C_b = CRS.commit(vkt_crs, poly_eval_b);
     const zs = [_]Fr{ Fr.zero(), Fr.zero() };
     const ys = [_]Fr{ Fr.fromInteger(1), Fr.fromInteger(32) };
     const fs = [_][256]Fr{ poly_eval_a, poly_eval_b };

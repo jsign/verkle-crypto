@@ -69,8 +69,6 @@ pub fn MonomialBasis(comptime PolyDegree: comptime_int) type {
     };
 }
 
-var allocator_test = std.testing.allocator;
-
 test "Vanishing Polynomial on domain" {
     const xs = [_]Fr{ Fr.fromInteger(0), Fr.fromInteger(1), Fr.fromInteger(2), Fr.fromInteger(3), Fr.fromInteger(4), Fr.fromInteger(5) };
     var z = MonomialBasis(xs.len).vanishingPoly(xs);

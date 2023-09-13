@@ -40,7 +40,7 @@ pub const Banderwagon = struct {
         return Banderwagon{ .point = ExtendedPoint.initUnsafe(x, y) };
     }
 
-    pub fn eq(self: *const Banderwagon, other: *const Banderwagon) bool {
+    pub fn eq(self: Banderwagon, other: Banderwagon) bool {
         // The equals method is different for the quotient group
         //
         // Check for the (0,0) point, which is _possible_
@@ -72,7 +72,7 @@ pub const Banderwagon = struct {
         return self;
     }
 
-    pub fn add(self: *Banderwagon, p: *const Banderwagon, q: *const Banderwagon) void {
+    pub fn add(self: *Banderwagon, p: Banderwagon, q: Banderwagon) void {
         self.point = ExtendedPoint.add(p.point, q.point);
     }
 
@@ -149,11 +149,12 @@ pub const Banderwagon = struct {
 
     // Multi scalar multiplication
     pub fn msm(points: []const Banderwagon, scalars: []const Fr) Banderwagon {
+        // TODO: assert params lengths.
         var res = Banderwagon.identity();
 
         for (scalars, points) |scalar, point| {
             const partial_res = point.scalarMul(scalar);
-            res.add(&res, &partial_res);
+            res.add(res, partial_res);
         }
         return res;
     }
@@ -200,7 +201,7 @@ test "serialize smoke" {
         var byts: [32]u8 = undefined;
         _ = try std.fmt.hexToBytes(&byts, bit_string);
         const decoded_point = try Banderwagon.fromBytes(byts);
-        try std.testing.expect(decoded_point.eq(&expected_point));
+        try std.testing.expect(decoded_point.eq(expected_point));
     }
 }
 
@@ -211,7 +212,7 @@ test "two torsion" {
     const two_torsion = Banderwagon.twoTorsionPoint();
 
     var result = Banderwagon.identity();
-    result.add(&gen, &two_torsion);
+    result.add(gen, two_torsion);
 
-    try std.testing.expect(result.eq(&gen));
+    try std.testing.expect(result.eq(gen));
 }

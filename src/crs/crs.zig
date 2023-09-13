@@ -29,9 +29,8 @@ pub const CRS = struct {
         };
     }
 
-    pub fn commit(self: CRS, values: []const Fr) Banderwagon {
-        std.debug.assert(self.Gs.len >= values.len);
-        return Banderwagon.msm(self.Gs[0..values.len], values);
+    pub fn commit(crs: CRS, values: [DomainSize]Fr) Banderwagon {
+        return Banderwagon.msm(&crs.Gs, &values);
     }
 };
 
@@ -70,7 +69,7 @@ test "Gs cannot contain the generator" {
     const crs = CRS.init();
     const generator = Banderwagon.generator();
     for (crs.Gs) |point| {
-        try std.testing.expect(!generator.eq(&point));
+        try std.testing.expect(!generator.eq(point));
     }
 }
 
