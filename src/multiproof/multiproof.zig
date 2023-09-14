@@ -8,6 +8,7 @@ const IPA = @import("../ipa/ipa.zig");
 const CRS = @import("../crs/crs.zig").CRS;
 const PrecomputedWeights = @import("../polynomial/precomputed_weights.zig").PrecomputedWeights;
 const Quotient = @import("quotient.zig");
+const assert = std.debug.assert;
 
 //TODO: FIX
 fn varbase_commit(values: []const Fr, elements: []const Banderwagon) Banderwagon {
@@ -135,11 +136,11 @@ const MultiProof = struct {
     fn check_multiproof(
         self: MultiProof,
         allocator: Allocator,
-        transcript: Transcript,
-        queries: []VerifierQuery,
+        transcript: *Transcript,
+        queries: []const VerifierQuery,
         proof: Proof,
     ) !bool {
-        transcript.domain_sep("multiproof");
+        transcript.domainSep("multiproof");
         const D = proof.D;
         const ipa_proof = proof.ipa;
 
@@ -147,17 +148,17 @@ const MultiProof = struct {
             const C_i = query.C;
             const z_i = query.z;
             const y_i = query.y;
-            transcript.append_point(C_i, "C");
-            transcript.append_scalar(z_i, "z");
-            transcript.append_scalar(y_i, "y");
+            transcript.appendPoint(C_i, "C");
+            transcript.appendScalar(z_i, "z");
+            transcript.appendScalar(y_i, "y");
         }
 
         // Step 1
-        const r = transcript.challenge_scalar("r");
+        const r = transcript.challengeScalar("r");
 
         // Step 2
-        transcript.append_point(D, "D");
-        const t = transcript.challenge_scalar("t");
+        transcript.appendPoint(D, "D");
+        const t = transcript.challengeScalar("t");
 
         var g_2_of_t = Fr.zero();
         var power_of_r = Fr.one();
@@ -166,7 +167,7 @@ const MultiProof = struct {
         var Cs = try allocator.alloc(Banderwagon, queries.len);
         for (queries, 0..) |query, i| {
             Cs[i] = query.C;
-            const z = query.z.toInteger();
+            const z = @as(u8, @intCast(query.z.toInteger()));
             const y = query.y;
             E_coefficients[i] = Fr.mul(power_of_r, Fr.sub(t, self.precomp.domain[z]).inv().?);
             g_2_of_t = Fr.add(g_2_of_t, Fr.mul(E_coefficients[i], y));
@@ -175,22 +176,32 @@ const MultiProof = struct {
         }
 
         const E = varbase_commit(E_coefficients, Cs);
-        transcript.append_point(E, "E");
+        transcript.appendPoint(E, "E");
 
         // Step 3 (Check IPA proofs)
         const y = g_2_of_t;
-        const ipa_commitment = E - D;
+        var ipa_commitment: Banderwagon = undefined;
+        ipa_commitment.sub(E, D);
         const input_point = t;
         const output_point = y;
-        const input_point_vector = self.precomp.barycentricFormulaConstants(allocator, input_point);
+        const input_point_vector = try self.precomp.barycentricFormulaConstants(allocator, input_point);
 
-        const query = IPA.VerifierQuery(ipa_commitment, input_point, input_point_vector, output_point, ipa_proof);
-        return IPA.check_ipa_proof(allocator, self.crs, transcript, query);
+        const query = IPA.VerifierQuery{
+            .commitment = ipa_commitment,
+            .point = input_point,
+            .point_evaluations = input_point_vector,
+            .output_point = output_point,
+            .proof = ipa_proof,
+        };
+        return IPA.check_ipa_proof(allocator, &self.crs, transcript, &query);
     }
 };
 
 test "basic" {
-    var allocator = std.testing.allocator;
+    var allocator2 = std.testing.allocator;
+    var arena = std.heap.ArenaAllocator.init(allocator2);
+    defer arena.deinit();
+    var allocator = arena.allocator();
 
     // Polynomials in lagrange basis
     const poly_eval_a = [_]Fr{
@@ -292,7 +303,6 @@ test "basic" {
 
     var prover_transcript = Transcript.init("test");
     const proof = try multiproof.make_multiproof(allocator, &prover_transcript, &[_]ProverQuery{ query_a, query_b });
-    _ = proof;
 
     // Lets check the state of the transcript by squeezing out another challenge
     const p_challenge = prover_transcript.challengeScalar("state");
@@ -302,14 +312,13 @@ test "basic" {
         &std.fmt.bytesToHex(p_challenge.to_bytes(), std.fmt.Case.lower),
     );
 
-    //         verifier_transcript = Transcript(b"test")
-    //         query_a = VerifierQuery(Cs[0], zs[0], ys[0])
-    //         query_b = VerifierQuery(Cs[1], zs[1], ys[1])
-    //         ok = multiproof.check_multiproof(
-    //             verifier_transcript, [query_a, query_b], proof)
+    var verifier_transcript = Transcript.init("test");
+    var vquery_a = VerifierQuery{ .C = Cs[0], .z = zs[0], .y = ys[0] };
+    var vquery_b = VerifierQuery{ .C = Cs[1], .z = zs[1], .y = ys[1] };
+    const ok = try multiproof.check_multiproof(allocator, &verifier_transcript, &[_]VerifierQuery{ vquery_a, vquery_b }, proof);
 
-    //         self.assertTrue(ok)
+    try std.testing.expect(ok);
 
-    //         v_challenge = verifier_transcript.challenge_scalar(b"state")
-    //         self.assertEqual(v_challenge, p_challenge)
+    const v_challenge = verifier_transcript.challengeScalar("state");
+    try std.testing.expectEqualSlices(u8, &p_challenge.to_bytes(), &v_challenge.to_bytes());
 }

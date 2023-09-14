@@ -30,7 +30,7 @@ pub fn compute_quotient_inside_domain(
             q[i] = Fr.mul(Fr.sub(f.evaluations.items[i], y), inverses[i - indexInt]);
             q[indexInt] = Fr.add(
                 q[indexInt],
-                Fr.mul(Fr.mul(Fr.mul(Fr.sub(f.evaluations.items[i], y), inverses[indexInt - i]), Aprime_domain[indexInt]), Aprime_domain_inv[i]),
+                Fr.mul(Fr.mul(Fr.mul(Fr.sub(f.evaluations.items[i], y), inverses[domain_size + i - indexInt]), Aprime_domain[indexInt]), Aprime_domain_inv[i]),
             );
         }
     }
