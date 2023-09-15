@@ -59,6 +59,8 @@ pub fn PrecomputedWeights(
         // b_i = A(z) / A'(DOMAIN[i]) * 1 / (z - DOMAIN[i])
         // The caller is responsible for freeing the returned slice.
         pub fn barycentricFormulaConstants(self: Self, z: Fr) [DomainSize]Fr {
+            std.debug.assert(z.toInteger() >= DomainSize);
+
             const Az = self.A.evaluate(z);
 
             var zSubXInvs: [DomainSize]Fr = undefined;

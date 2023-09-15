@@ -79,7 +79,7 @@ fn benchPedersenHash() !void {
         for (0..N) |i| {
             _ = xcrs.commit(vecs[i]);
         }
-        std.debug.print(" naive takes {}µs", .{@divTrunc((std.time.microTimestamp() - start), (N))});
+        std.debug.print("naive takes {}µs", .{@divTrunc((std.time.microTimestamp() - start), (N))});
 
         start = std.time.microTimestamp();
         for (0..N) |i| {
@@ -107,12 +107,14 @@ fn benchIPAs() !void {
     var allocator = gpa.allocator();
 
     var prover_queries: []IPA.ProverQuery = try allocator.alloc(IPA.ProverQuery, 16);
+    defer allocator.free(prover_queries);
+    const z256 = Fr.fromInteger(256);
     for (0..prover_queries.len) |i| {
         for (0..prover_queries[i].A.len) |j| {
             prover_queries[i].A[j] = Fr.fromInteger(i + j + 0x424242);
         }
         prover_queries[i].commitment = xcrs.commit(prover_queries[i].A);
-        prover_queries[i].eval_point = Fr.fromInteger((i + 0x414039) % 256);
+        prover_queries[i].eval_point = Fr.fromInteger(i + 0x414039).add(z256);
         prover_queries[i].B = weights.barycentricFormulaConstants(prover_queries[i].eval_point);
     }
 
