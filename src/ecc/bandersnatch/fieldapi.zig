@@ -1,5 +1,6 @@
 const std = @import("std");
 const builtin = @import("builtin");
+const fastsqrt = @import("sqrt.zig");
 const ArrayList = std.ArrayList;
 
 pub const Fp = BandersnatchField(@import("gen_fp.zig"), 52435875175126190479447740508185965837690552500527637822603658699938581184513);
@@ -124,6 +125,10 @@ fn BandersnatchField(comptime F: type, comptime mod: u256) type {
             return self.eq(one());
         }
 
+        pub fn square(self: Self) Self {
+            return self.mul(self);
+        }
+
         pub inline fn pow2(self: Self, comptime exponent: u8) Self {
             var ret = self;
             inline for (exponent) |_| {
@@ -193,6 +198,20 @@ fn BandersnatchField(comptime F: type, comptime mod: u256) type {
             F.toBytes(&bytes, non_mont);
 
             return std.mem.readInt(u256, &bytes, std.builtin.Endian.Little);
+        }
+
+        pub fn sqrtFast(x: Self) ?Self {
+            if (x.isZero()) {
+                return null;
+            }
+            var candidate: Self = undefined;
+            var rootOfUnity: Self = undefined;
+            fastsqrt.sqrtAlg_ComputeRelevantPowers(x, &candidate, &rootOfUnity);
+            if (!fastsqrt.invSqrtEqDyadic(&rootOfUnity)) {
+                return null;
+            }
+
+            return mul(candidate, rootOfUnity);
         }
 
         pub fn sqrt(a: Self) ?Self {
