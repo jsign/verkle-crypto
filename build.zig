@@ -12,10 +12,6 @@ pub fn build(b: *std.Build) void {
     });
     b.installArtifact(lib);
 
-    // _ = b.createModule(.{
-    //     .source_file = .{ .path = "ecc/bandersnatch/bandersnatch.zig" },
-    // });
-
     const main_tests = b.addTest(.{
         .root_source_file = .{ .path = "src/main.zig" },
         .target = target,
@@ -23,6 +19,17 @@ pub fn build(b: *std.Build) void {
     });
     const test_step = b.step("test", "Run library tests");
     const run_test = b.addRunArtifact(main_tests);
-    run_test.has_side_effects = true;
+    // run_test.has_side_effects = true;
     test_step.dependOn(&run_test.step);
+
+    var bench = b.addExecutable(.{
+        .name = "bench",
+        .root_source_file = .{ .path = "src/bench.zig" },
+        .target = target,
+        .optimize = optimize,
+    });
+
+    const bench_step = b.step("bench", "Run benchmarks");
+    const run_a = b.addRunArtifact(bench);
+    bench_step.dependOn(&run_a.step);
 }
