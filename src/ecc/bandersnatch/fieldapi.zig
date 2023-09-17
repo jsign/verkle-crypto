@@ -200,7 +200,7 @@ fn BandersnatchField(comptime F: type, comptime mod: u256) type {
             return std.mem.readInt(u256, &bytes, std.builtin.Endian.Little);
         }
 
-        pub fn sqrtFast(x: Self) ?Self {
+        pub fn sqrt(x: Self) ?Self {
             if (x.isZero()) {
                 return null;
             }
@@ -214,7 +214,7 @@ fn BandersnatchField(comptime F: type, comptime mod: u256) type {
             return mul(candidate, rootOfUnity);
         }
 
-        pub fn sqrt(a: Self) ?Self {
+        pub fn sqrt_slow(a: Self) ?Self {
             // Find a quadratic residue (mod p) of 'a'. p
             // must be an odd prime.
             // Solve the congruence of the form:

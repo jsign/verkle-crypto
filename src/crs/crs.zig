@@ -1,41 +1,79 @@
 const std = @import("std");
 const sha256 = std.crypto.hash.sha2.Sha256;
-const Allocator = std.mem.Allocator;
-const Bandersnatch = @import("../ecc/bandersnatch/bandersnatch.zig");
-const Fr = Bandersnatch.Fr;
+const Fr = @import("../ecc/bandersnatch/bandersnatch.zig").Fr;
 const Banderwagon = @import("../ecc/bandersnatch/banderwagon.zig").Banderwagon;
 
-pub const CRS = struct {
-    allocator: Allocator,
-    BASIS_G: []const Banderwagon,
-    BASIS_Q: Banderwagon,
+// DomainSize is the size of the domain (i.e: 256).
+pub const DomainSize = 256;
 
-    pub fn init(allocator: Allocator) !CRS {
-        return .{
-            .BASIS_G = try getCRS(allocator),
-            .BASIS_Q = Banderwagon.generator(),
-            .allocator = allocator,
+// Domain is an array with the domain elements (i.e: [0..255])
+pub const Domain: [DomainSize]Fr = blk: {
+    @setEvalBranchQuota(1_000_000);
+    var domain: [DomainSize]Fr = undefined;
+    for (0..DomainSize) |i| {
+        domain[i] = Fr.fromInteger(i);
+    }
+    break :blk domain;
+};
+
+// CRS contains the CRS to be used in IPAs.
+pub const CRS = struct {
+    Gs: [DomainSize]Banderwagon,
+    Q: Banderwagon,
+
+    pub fn init() CRS {
+        return CRS{
+            .Gs = deserialize_vkt_points(),
+            .Q = Banderwagon.generator(),
         };
     }
 
-    pub fn deinit(self: *const CRS) void {
-        self.allocator.free(self.BASIS_G);
-    }
-
-    pub fn getItem(self: CRS, index: usize) Banderwagon {
-        return self.BASIS_G[index];
-    }
-
-    pub fn commit(self: *const CRS, values: []const Fr) Banderwagon {
-        std.debug.assert(self.BASIS_G.len >= values.len);
-        return Banderwagon.msm(self.BASIS_G[0..values.len], values);
+    pub fn commit(self: CRS, values: []const Fr) Banderwagon {
+        std.debug.assert(self.Gs.len >= values.len);
+        return Banderwagon.msm(self.Gs[0..values.len], values);
     }
 };
 
-// TODO(jsign): despite not necessary, we can avoid hardcoded points and try to derive them
-// as described in the spec (i.e: seed "verkle trie" + try-and-increment with subgroup check (mul by order or clearing cofactor))
-// # Hardcoded CRS constant
-const CRS_CONSTANTS = [_][]const u8{
+fn deserialize_vkt_points() [DomainSize]Banderwagon {
+    var points: [crs_points.len]Banderwagon = undefined;
+    for (crs_points, 0..) |serialized_point, i| {
+        var g_be_bytes: [32]u8 = undefined;
+        _ = std.fmt.hexToBytes(&g_be_bytes, serialized_point) catch unreachable;
+        points[i] = Banderwagon.fromBytes(g_be_bytes) catch unreachable;
+    }
+    return points;
+}
+
+test "crs is consistent" {
+    const crs = CRS.init();
+    try std.testing.expect(crs.Gs.len == crs_points.len);
+
+    // Reserialize Gs points and check they match with the original representation.
+    for (crs.Gs, 0..) |g, i| {
+        const got_point = std.fmt.bytesToHex(g.to_bytes(), std.fmt.Case.lower);
+        const expected_point = crs_points[i];
+        try std.testing.expect(std.mem.eql(u8, &got_point, expected_point));
+    }
+
+    // Check all points have the expected fingerprint.
+    var hasher = sha256.init(.{});
+    for (crs.Gs) |point| {
+        hasher.update(&point.to_bytes());
+    }
+    const result = hasher.finalResult();
+    const result_hex = std.fmt.bytesToHex(result, std.fmt.Case.lower);
+    try std.testing.expectEqualStrings("1fcaea10bf24f750200e06fa473c76ff0468007291fa548e2d99f09ba9256fdb", &result_hex);
+}
+
+test "Gs cannot contain the generator" {
+    const crs = CRS.init();
+    const generator = Banderwagon.generator();
+    for (crs.Gs) |point| {
+        try std.testing.expect(!generator.eq(&point));
+    }
+}
+
+const crs_points = [_][]const u8{
     "01587ad1336675eb912550ec2a28eb8923b824b490dd2ba82e48f14590a298a0",
     "6c6e607df0723edfff382fa914bfc38136f3300ab2e06fb97007b559fd323b82",
     "326be3bebfd97ed9d0d4ca1b8bc47e036a24b129f1488110b71c2cae1463db8f",
@@ -293,55 +331,3 @@ const CRS_CONSTANTS = [_][]const u8{
     "3102a5884d3dce8d94a8cf6d5ab2d3a4c76ec8b00f4554caa68c028aedf5970f",
     "3de2be346b539395b0c0de56a5ccca54a317f1b5c80107b0802af9a62276a4d8",
 };
-
-// TODO(jsign): comptime.
-// getCRS returns the basis for vector commitments.
-// The caller should free the returned points.
-fn getCRS(allocator: Allocator) ![]Banderwagon {
-    var points = try allocator.alloc(Banderwagon, CRS_CONSTANTS.len);
-    for (CRS_CONSTANTS, 0..) |g_bytes, i| {
-        var g_be_bytes: [32]u8 = undefined;
-        _ = try std.fmt.hexToBytes(&g_be_bytes, g_bytes);
-        // TODO(jsign): change fromBytes API to slice.
-        const point = try Banderwagon.fromBytes(g_be_bytes);
-        points[i] = point;
-    }
-    return points;
-}
-
-const testAllocator = std.testing.allocator;
-test "crs is consistent" {
-    // Test that the CRS is consistent with https://hackmd.io/1RcGSMQgT4uREaq1CCx_cg#Methodology
-    var crs = try getCRS(testAllocator);
-    defer testAllocator.free(crs);
-
-    try std.testing.expect(crs.len == CRS_CONSTANTS.len);
-
-    for (crs, 0..) |g, i| {
-        const got_point = std.fmt.bytesToHex(g.to_bytes(), std.fmt.Case.lower);
-        const expected_point = CRS_CONSTANTS[i];
-        try std.testing.expect(std.mem.eql(u8, &got_point, expected_point));
-    }
-
-    var hasher = sha256.init(.{});
-    for (crs) |point| {
-        hasher.update(&point.to_bytes());
-    }
-    const result = hasher.finalResult();
-    const result_hex = std.fmt.bytesToHex(result, std.fmt.Case.lower);
-
-    try std.testing.expectEqualStrings("1fcaea10bf24f750200e06fa473c76ff0468007291fa548e2d99f09ba9256fdb", &result_hex);
-}
-
-test "not generator" {
-    // We use the generator point as the point `Q`, corresponding to the inner product
-    // so we check if the generated point is one of these
-    const crs = try getCRS(testAllocator);
-    defer testAllocator.free(crs);
-
-    const generator = Banderwagon.generator();
-
-    for (crs) |point| {
-        try std.testing.expect(!generator.eq(&point));
-    }
-}

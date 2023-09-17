@@ -3,7 +3,7 @@ const Bandersnatch = @import("../ecc/bandersnatch/bandersnatch.zig");
 const Banderwagon = @import("../ecc/bandersnatch/banderwagon.zig").Banderwagon;
 const Fr = Bandersnatch.Fr;
 const PrecomputedWeights = @import("../polynomial/precomputed_weights.zig").PrecomputedWeights;
-const CRS = @import("../crs/crs.zig").CRS;
+const crs = @import("../crs/crs.zig");
 const Transcript = @import("transcript.zig");
 const Common = @import("common.zig");
 const ArrayList = std.ArrayList;
@@ -37,7 +37,7 @@ pub const VerifierQuery = struct {
     point: Fr,
     // If polynomial was in monomial basis
     // this would be <1, b, b^2, b^3, b^4,..., b^n>
-    point_evaluations: []Fr,
+    point_evaluations: []const Fr,
     output_point: Fr,
     proof: Proof,
 };
@@ -47,7 +47,7 @@ pub const VerifierQuery = struct {
 // Furthermore, b is assumed to be public, hence we will not commit to it
 //
 // The caller is responsible for calling deinit() in the returned proof.
-pub fn make_ipa_proof(allocator: Allocator, crs: CRS, transcript: *Transcript, query: *ProverQuery) !struct { result: Fr, proof: Proof } {
+pub fn make_ipa_proof(allocator: Allocator, xcrs: crs.CRS, transcript: *Transcript, query: *ProverQuery) !struct { result: Fr, proof: Proof } {
     transcript.domainSep("ipa");
 
     var n = query.polynomial.len;
@@ -75,9 +75,9 @@ pub fn make_ipa_proof(allocator: Allocator, crs: CRS, transcript: *Transcript, q
     transcript.appendScalar(y, "output point");
     const w = transcript.challengeScalar("w");
 
-    const q = crs.BASIS_Q.scalarMul(w);
+    const q = xcrs.Q.scalarMul(w);
 
-    var current_basis = try allocator.dupe(Banderwagon, crs.BASIS_G);
+    var current_basis = try allocator.dupe(Banderwagon, &xcrs.Gs);
 
     while (n > 1) {
         // Reduction step
@@ -128,7 +128,7 @@ pub fn make_ipa_proof(allocator: Allocator, crs: CRS, transcript: *Transcript, q
     return .{ .result = y, .proof = proof };
 }
 
-pub fn check_ipa_proof(base_allocator: Allocator, crs: *const CRS, transcript: *Transcript, query: *const VerifierQuery) !bool {
+pub fn check_ipa_proof(base_allocator: Allocator, xcrs: crs.CRS, transcript: *Transcript, query: *const VerifierQuery) !bool {
     var arena = std.heap.ArenaAllocator.init(base_allocator);
     defer arena.deinit();
     var allocator = arena.allocator();
@@ -151,7 +151,7 @@ pub fn check_ipa_proof(base_allocator: Allocator, crs: *const CRS, transcript: *
     transcript.appendScalar(y, "output point");
     const w = transcript.challengeScalar("w");
 
-    const q = crs.BASIS_Q.scalarMul(w);
+    const q = xcrs.Q.scalarMul(w);
 
     var current_commitment: Banderwagon = undefined;
     current_commitment.add(&C, &q.scalarMul(y));
@@ -182,7 +182,8 @@ pub fn check_ipa_proof(base_allocator: Allocator, crs: *const CRS, transcript: *
     }
 
     // Do it the inefficient way (TODO: optimize)
-    var current_basis = crs.BASIS_G;
+    var gs_copy = xcrs.Gs;
+    var current_basis: []Banderwagon = gs_copy[0..];
 
     for (0..xs.items.len) |j| {
         const g_split = split_list_in_half(Banderwagon, current_basis);
@@ -242,13 +243,7 @@ test "basic proof" {
     var allocator = arena.allocator();
 
     // Test a simple IPA proof
-    var domain = try allocator.alloc(Fr, 256);
-    defer allocator.free(domain);
-    for (0..256) |i| {
-        domain[i] = Fr.fromInteger(i);
-    }
-    var weights = try PrecomputedWeights.init(allocator, domain);
-    defer weights.deinit();
+    var weights = PrecomputedWeights(crs.DomainSize, crs.Domain).init();
 
     // Polynomial in lagrange basis
     var lagrange_poly = try allocator.alloc(Fr, 256);
@@ -258,9 +253,8 @@ test "basic proof" {
     }
 
     // Commit to the polynomial in lagrange basis
-    const crs = try CRS.init(allocator);
-    defer crs.deinit();
-    const commitment = crs.commit(lagrange_poly);
+    const xcrs = crs.CRS.init();
+    const commitment = xcrs.commit(lagrange_poly);
 
     const expected_comm = std.fmt.bytesToHex(commitment.to_bytes(), std.fmt.Case.lower);
     try std.testing.expectEqualStrings("1b9dff8f5ebbac250d291dfe90e36283a227c64b113c37f1bfb9e7a743cdb128", &expected_comm);
@@ -269,9 +263,8 @@ test "basic proof" {
 
     // create a opening proof for a point outside of the domain
     const input_point = Fr.fromInteger(2101);
-    var b = try weights.barycentricFormulaConstants(allocator, input_point);
-    defer allocator.free(b);
-    const output_point_check = Common.innerProduct(lagrange_poly, b);
+    const b = weights.barycentricFormulaConstants(input_point);
+    const output_point_check = Common.innerProduct(lagrange_poly, &b);
     const output_point_check_hex = std.fmt.bytesToHex(output_point_check.to_bytes(), std.fmt.Case.lower);
     try std.testing.expectEqualStrings("4a353e70b03c89f161de002e8713beec0d740a5e20722fd5bd68b30540a33208", &output_point_check_hex);
 
@@ -279,10 +272,10 @@ test "basic proof" {
         .polynomial = lagrange_poly,
         .commitment = commitment,
         .point = input_point,
-        .point_evaluations = b,
+        .point_evaluations = &b,
     };
 
-    var ipa_proof = try make_ipa_proof(allocator, crs, &prover_transcript, &query);
+    var ipa_proof = try make_ipa_proof(allocator, xcrs, &prover_transcript, &query);
     defer ipa_proof.proof.deinit();
 
     // Lets check the state of the transcript by squeezing out another challenge
@@ -292,15 +285,14 @@ test "basic proof" {
 
     // Verify the proof.
     var verifier_transcript = Transcript.init("test");
-    const b_verifier = try weights.barycentricFormulaConstants(allocator, input_point);
-    defer allocator.free(b_verifier);
+    const b_verifier = weights.barycentricFormulaConstants(input_point);
     const verifier_query = VerifierQuery{
         .commitment = commitment,
         .point = input_point,
-        .point_evaluations = b_verifier,
+        .point_evaluations = &b_verifier,
         .output_point = ipa_proof.result,
         .proof = ipa_proof.proof,
     };
-    const ok = try check_ipa_proof(allocator, &crs, &verifier_transcript, &verifier_query);
+    const ok = try check_ipa_proof(allocator, xcrs, &verifier_transcript, &verifier_query);
     try std.testing.expect(ok);
 }

@@ -311,7 +311,7 @@ test "correctness" {
         // Take a random fp.
         var a: Fp = Fp.fromInteger(i);
 
-        const sqrt_fast = Fp.sqrtFast(a);
+        const sqrt_fast = Fp.sqrt(a);
         if (sqrt_fast == null) {
             continue;
         }
@@ -322,7 +322,7 @@ test "correctness" {
         try std.testing.expect(regen_new.eq(a));
 
         // Calculate the sqrt with the original gnark code.
-        const sqrt_slow = Fp.sqrt(a);
+        const sqrt_slow = Fp.sqrt_slow(a);
         var regen_slow = Fp.mul(sqrt_slow.?, sqrt_slow.?);
         try std.testing.expect(regen_slow.eq(a));
 

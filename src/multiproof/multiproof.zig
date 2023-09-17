@@ -5,7 +5,8 @@ const Banderwagon = @import("../ecc/bandersnatch/banderwagon.zig").Banderwagon;
 const LagrangeBasis = @import("../polynomial/lagrange_basis.zig").LagrangeBasis;
 const Transcript = @import("../ipa/transcript.zig");
 const IPA = @import("../ipa/ipa.zig");
-const CRS = @import("../crs/crs.zig").CRS;
+const crs = @import("../crs/crs.zig");
+const CRS = crs.CRS;
 const PrecomputedWeights = @import("../polynomial/precomputed_weights.zig").PrecomputedWeights;
 const Quotient = @import("quotient.zig");
 const assert = std.debug.assert;
@@ -36,13 +37,13 @@ const Proof = struct {
 };
 
 const MultiProof = struct {
-    precomp: PrecomputedWeights,
+    precomp: PrecomputedWeights(crs.DomainSize, crs.Domain),
     crs: CRS,
 
-    fn init(allocator: Allocator, domain: []Fr, crs: CRS) !MultiProof {
+    pub fn init(vkt_crs: CRS) MultiProof {
         return MultiProof{
-            .precomp = try PrecomputedWeights.init(allocator, domain),
-            .crs = crs, // TODO: check if assignement does copy (if needed)
+            .precomp = PrecomputedWeights(crs.DomainSize, crs.Domain).init(),
+            .crs = vkt_crs,
         };
     }
 
@@ -52,8 +53,6 @@ const MultiProof = struct {
         transcript: *Transcript,
         queries: []const ProverQuery,
     ) !Proof {
-        const domain_size = self.precomp.domain.len; // TODO: comptime.
-
         transcript.domainSep("multiproof");
 
         // Add queries into transcript
@@ -66,13 +65,13 @@ const MultiProof = struct {
         // Generate challenge from queries
         const r = transcript.challengeScalar("r");
 
-        var g = [_]Fr{Fr.zero()} ** 256; // TODO: comptime.
+        var g = [_]Fr{Fr.zero()} ** crs.DomainSize;
         var power_of_r = Fr.one();
         for (queries) |query| {
             const f = query.f;
             const index = query.z;
             const quotient = try Quotient.compute_quotient_inside_domain(allocator, self.precomp, f, index);
-            for (0..domain_size) |i| {
+            for (0..crs.DomainSize) |i| {
                 g[i] = Fr.add(g[i], Fr.mul(power_of_r, quotient.evaluations.items[i]));
             }
 
@@ -86,14 +85,14 @@ const MultiProof = struct {
 
         const t = transcript.challengeScalar("t");
 
-        var h = [_]Fr{Fr.zero()} ** 256; // TODO
+        var h = [_]Fr{Fr.zero()} ** crs.DomainSize;
         power_of_r = Fr.one();
 
         for (queries) |query| {
             const f = query.f;
             const index = @as(u8, @intCast(query.z.toInteger()));
-            const denominator_inv = Fr.sub(t, self.precomp.domain[index]).inv().?;
-            for (0..domain_size) |i| {
+            const denominator_inv = Fr.sub(t, crs.Domain[index]).inv().?;
+            for (0..crs.DomainSize) |i| {
                 h[i] = Fr.add(
                     h[i],
                     Fr.mul(Fr.mul(power_of_r, f.evaluations.items[i]), denominator_inv),
@@ -118,13 +117,13 @@ const MultiProof = struct {
 
         const polynomial = h_minus_g;
         const input_point = t;
-        const input_point_vector = try self.precomp.barycentricFormulaConstants(allocator, input_point);
+        const input_point_vector = self.precomp.barycentricFormulaConstants(input_point);
 
         var query = IPA.ProverQuery{
             .polynomial = &polynomial,
             .commitment = ipa_commitment,
             .point = input_point,
-            .point_evaluations = input_point_vector,
+            .point_evaluations = &input_point_vector,
         };
 
         // TODO: simplify proof_res
@@ -169,7 +168,7 @@ const MultiProof = struct {
             Cs[i] = query.C;
             const z = @as(u8, @intCast(query.z.toInteger()));
             const y = query.y;
-            E_coefficients[i] = Fr.mul(power_of_r, Fr.sub(t, self.precomp.domain[z]).inv().?);
+            E_coefficients[i] = Fr.mul(power_of_r, Fr.sub(t, crs.Domain[z]).inv().?);
             g_2_of_t = Fr.add(g_2_of_t, Fr.mul(E_coefficients[i], y));
 
             power_of_r = Fr.mul(power_of_r, r);
@@ -184,16 +183,16 @@ const MultiProof = struct {
         ipa_commitment.sub(E, D);
         const input_point = t;
         const output_point = y;
-        const input_point_vector = try self.precomp.barycentricFormulaConstants(allocator, input_point);
+        const input_point_vector = self.precomp.barycentricFormulaConstants(input_point);
 
         const query = IPA.VerifierQuery{
             .commitment = ipa_commitment,
             .point = input_point,
-            .point_evaluations = input_point_vector,
+            .point_evaluations = &input_point_vector,
             .output_point = output_point,
             .proof = ipa_proof,
         };
-        return IPA.check_ipa_proof(allocator, &self.crs, transcript, &query);
+        return IPA.check_ipa_proof(allocator, self.crs, transcript, &query);
     }
 };
 
@@ -273,9 +272,9 @@ test "basic" {
         Fr.fromInteger(1),
     } ** 8;
 
-    const crs = try CRS.init(allocator);
-    const C_a = crs.commit(&poly_eval_a);
-    const C_b = crs.commit(&poly_eval_b);
+    const vkt_crs = CRS.init();
+    const C_a = vkt_crs.commit(&poly_eval_a);
+    const C_b = vkt_crs.commit(&poly_eval_b);
     const zs = [_]Fr{ Fr.zero(), Fr.zero() };
     const ys = [_]Fr{ Fr.fromInteger(1), Fr.fromInteger(32) };
     const fs = [_][256]Fr{ poly_eval_a, poly_eval_b };
@@ -299,7 +298,7 @@ test "basic" {
         .y = ys[1],
     };
 
-    const multiproof = try MultiProof.init(allocator, &domain, crs);
+    const multiproof = MultiProof.init(vkt_crs);
 
     var prover_transcript = Transcript.init("test");
     const proof = try multiproof.make_multiproof(allocator, &prover_transcript, &[_]ProverQuery{ query_a, query_b });
