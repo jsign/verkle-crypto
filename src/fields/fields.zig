@@ -3,20 +3,24 @@ const builtin = @import("builtin");
 const fastsqrt = @import("sqrt.zig");
 const ArrayList = std.ArrayList;
 
-pub const Fp = BandersnatchField(@import("gen_fp.zig"), 52435875175126190479447740508185965837690552500527637822603658699938581184513);
-pub const Fr = BandersnatchField(@import("gen_fr.zig"), 13108968793781547619861935127046491459309155893440570251786403306729687672801);
+pub const BandersnatchFields = struct {
+    // BaseField is the base field of the Bandersnatch curve.
+    pub const BaseField = Field(@import("gen_fp.zig"), 52435875175126190479447740508185965837690552500527637822603658699938581184513);
+    // ScalarField is the scalar field of the Bandersnatch prime-order subgroup.
+    pub const ScalarField = Field(@import("gen_fr.zig"), 13108968793781547619861935127046491459309155893440570251786403306729687672801);
+};
 
-fn BandersnatchField(comptime F: type, comptime mod: u256) type {
+fn Field(comptime F: type, comptime mod: u256) type {
     return struct {
         pub const BYTE_LEN = 32;
         pub const MODULO = mod;
+        pub const Q_MIN_ONE_DIV_2 = (MODULO - 1) / 2;
 
         comptime {
             std.debug.assert(@bitSizeOf(u256) == BYTE_LEN * 8);
         }
 
         const Self = @This();
-        const Q_MIN_ONE_DIV_2 = (MODULO - 1) / 2;
         const baseZero = val: {
             var bz: F.MontgomeryDomainFieldElement = undefined;
             F.fromBytes(&bz, [_]u8{0} ** BYTE_LEN);
@@ -319,87 +323,4 @@ fn BandersnatchField(comptime F: type, comptime mod: u256) type {
             return 1;
         }
     };
-}
-
-// TODO(jsign): test with Fr.
-
-test "one" {
-    const oneFromInteger = Fp.fromInteger(1);
-    const oneFromAPI = Fp.one();
-
-    try std.testing.expect(oneFromInteger.eq(oneFromAPI));
-}
-
-test "zero" {
-    const zeroFromInteger = Fp.fromInteger(0);
-    const zeroFromAPI = Fp.zero();
-
-    try std.testing.expect(zeroFromInteger.eq(zeroFromAPI));
-}
-
-test "lexographically largest" {
-    try std.testing.expect(!Fp.fromInteger(0).lexographicallyLargest());
-    try std.testing.expect(!Fp.fromInteger(Fp.Q_MIN_ONE_DIV_2).lexographicallyLargest());
-
-    try std.testing.expect(Fp.fromInteger(Fp.Q_MIN_ONE_DIV_2 + 1).lexographicallyLargest());
-    try std.testing.expect(Fp.fromInteger(Fp.MODULO - 1).lexographicallyLargest());
-}
-
-test "from and to bytes" {
-    const cases = [_]Fp{ Fp.fromInteger(0), Fp.fromInteger(1), Fp.fromInteger(Fp.Q_MIN_ONE_DIV_2), Fp.fromInteger(Fp.MODULO - 1) };
-
-    for (cases) |fe| {
-        const bytes = fe.to_bytes();
-        const fe2 = Fp.from_bytes(bytes);
-        try std.testing.expect(fe.eq(fe2));
-
-        const bytes2 = fe2.to_bytes();
-        try std.testing.expectEqualSlices(u8, &bytes, &bytes2);
-    }
-}
-
-test "to integer" {
-    try std.testing.expect(Fp.fromInteger(0).toInteger() == 0);
-    try std.testing.expect(Fp.fromInteger(1).toInteger() == 1);
-    try std.testing.expect(Fp.fromInteger(100).toInteger() == 100);
-}
-
-test "add sub mul neg" {
-    const got = Fp.fromInteger(10).mul(Fp.fromInteger(20)).add(Fp.fromInteger(30)).sub(Fp.fromInteger(40)).add(Fp.fromInteger(Fp.MODULO));
-    const want = Fp.fromInteger(190);
-    try std.testing.expect(got.eq(want));
-
-    const gotneg = got.neg();
-    const wantneg = Fp.fromInteger(Fp.MODULO - 190);
-    try std.testing.expect(gotneg.eq(wantneg));
-}
-
-test "inv" {
-    const types = [_]type{Fp};
-
-    inline for (types) |T| {
-        try std.testing.expect(T.fromInteger(0).inv() == null);
-
-        const one = T.one();
-        const cases = [_]T{ T.fromInteger(2), T.fromInteger(42), T.fromInteger(T.MODULO - 1) };
-        for (cases) |fe| {
-            try std.testing.expect(fe.mul(fe.inv().?).eq(one));
-        }
-    }
-}
-
-test "sqrt" {
-    // Test that a non-residue has no square root.
-    const nonresidue = Fp.fromInteger(42);
-    try std.testing.expect(nonresidue.legendre() != 1);
-    try std.testing.expect(nonresidue.sqrt() == null);
-
-    // Test that a residue has a square root and sqrt(b)^2=b.
-    const b = Fp.fromInteger(44);
-    try std.testing.expect(b.legendre() == 1);
-
-    const b_sqrt = b.sqrt().?;
-    const b_sqrt_sqr = b_sqrt.mul(b_sqrt);
-
-    try std.testing.expect(b.eq(b_sqrt_sqr));
 }

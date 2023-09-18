@@ -1,11 +1,15 @@
 const std = @import("std");
-const Bandersnatch = @import("bandersnatch.zig");
+const Bandersnatch = @import("../bandersnatch/bandersnatch.zig");
+// TODO: try to avoid this dependency?
 const Fp = Bandersnatch.Fp;
-const Fr = Bandersnatch.Fr;
 const AffinePoint = Bandersnatch.AffinePoint;
 const ExtendedPoint = Bandersnatch.ExtendedPoint;
 const ArrayList = std.ArrayList;
 const allocator_test = std.testing.allocator;
+
+// Fr is the scalar field of the Banderwgaon group, which matches with the
+// scalar field size of the Bandersnatch primer-ordered subgroup.
+pub const Fr = Bandersnatch.Fr;
 
 // TODO(jsign): move to separate module.
 pub const Banderwagon = struct {

@@ -2,9 +2,8 @@ const std = @import("std");
 const Allocator = std.mem.Allocator;
 const PrecomputedWeights = @import("../polynomial/precomputed_weights.zig").PrecomputedWeights;
 const LagrangeBasis = @import("../polynomial/lagrange_basis.zig").LagrangeBasis;
-const Bandersnatch = @import("../ecc/bandersnatch/bandersnatch.zig");
+const Fr = @import("../banderwagon/banderwagon.zig").Fr;
 const crs = @import("../crs/crs.zig");
-const Fr = Bandersnatch.Fr;
 
 pub fn compute_quotient_inside_domain(
     allocator: Allocator,

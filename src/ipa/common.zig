@@ -1,6 +1,5 @@
 const std = @import("std");
-const Bandersnatch = @import("../ecc/bandersnatch/bandersnatch.zig");
-const Fr = Bandersnatch.Fr;
+const Fr = @import("../banderwagon/banderwagon.zig").Fr;
 
 // TODO: Methods here may be moved into different modules in the future
 

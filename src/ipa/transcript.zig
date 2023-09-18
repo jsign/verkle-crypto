@@ -1,8 +1,8 @@
 const std = @import("std");
 const sha256 = std.crypto.hash.sha2.Sha256;
-const Bandersnatch = @import("../ecc/bandersnatch/bandersnatch.zig");
-const Banderwagon = @import("../ecc/bandersnatch/banderwagon.zig").Banderwagon;
-const Fr = Bandersnatch.Fr;
+const banderwagon = @import("../banderwagon/banderwagon.zig");
+const Banderwagon = banderwagon.Banderwagon;
+const Fr = banderwagon.Fr;
 
 state: sha256,
 
@@ -101,7 +101,7 @@ test "test vector" {
     // Test that squeezing out a challenge twice
     // will produce different challenges. ie it is
     // not possible to accidentally generate the same challenge
-    var transcript = init("foo");
+    var transcript = Transcript.init("foo");
     const first_challenge = transcript.challengeScalar("f");
     const second_challenge = transcript.challengeScalar("f");
 

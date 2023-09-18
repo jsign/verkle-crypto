@@ -1,7 +1,6 @@
 const std = @import("std");
 const ArrayList = std.ArrayList;
-const Bandersnatch = @import("../ecc/bandersnatch/bandersnatch.zig");
-const Fr = Bandersnatch.Fr;
+const Fr = @import("../banderwagon/banderwagon.zig").Fr;
 
 pub const OperationError = error{LengthMismatch};
 

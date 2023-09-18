@@ -1,7 +1,8 @@
 const std = @import("std");
 const sha256 = std.crypto.hash.sha2.Sha256;
-const Fr = @import("../ecc/bandersnatch/bandersnatch.zig").Fr;
-const Banderwagon = @import("../ecc/bandersnatch/banderwagon.zig").Banderwagon;
+const banderwagon = @import("../banderwagon/banderwagon.zig");
+const Banderwagon = banderwagon.Banderwagon;
+const Fr = banderwagon.Fr;
 
 // DomainSize is the size of the domain (i.e: 256).
 pub const DomainSize = 256;

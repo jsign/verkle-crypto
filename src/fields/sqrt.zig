@@ -2,7 +2,7 @@
 // https://github.com/GottfriedHerold/Bandersnatch/blob/f665f90b64892b9c4c89cff3219e70456bb431e5/bandersnatch/fieldElements/field_element_square_root.go
 
 const std = @import("std");
-const Fp = @import("fieldapi.zig").Fp;
+const Fp = @import("fields.zig").BandersnatchFields.BaseField;
 
 const feType_SquareRoot = Fp;
 

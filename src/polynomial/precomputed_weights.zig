@@ -1,8 +1,7 @@
 const std = @import("std");
 const assert = std.debug.assert;
 const crs = @import("../crs/crs.zig");
-const Bandersnatch = @import("../ecc/bandersnatch/bandersnatch.zig");
-const Fr = Bandersnatch.Fr;
+const Fr = @import("../banderwagon/banderwagon.zig").Fr;
 const MonomialBasis = @import("monomial_basis.zig").MonomialBasis;
 const LagrangeBasis = @import("lagrange_basis.zig").LagrangeBasis; // TODO(jsign): reconsider having the wrapper.
 
