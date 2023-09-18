@@ -4,20 +4,20 @@ const banderwagon = @import("../banderwagon/banderwagon.zig");
 const Banderwagon = banderwagon.Banderwagon;
 const Fr = banderwagon.Fr;
 
-// DomainSize is the size of the domain (i.e: 256).
+// DomainSize is the size of the domain.
 pub const DomainSize = 256;
 
-// Domain is an array with the domain elements (i.e: [0..255])
-pub const Domain: [DomainSize]Fr = blk: {
+// Domain is an array with the domain elements.
+pub const Domain: [DomainSize]Fr = domain_elements: {
     @setEvalBranchQuota(1_000_000);
     var domain: [DomainSize]Fr = undefined;
     for (0..DomainSize) |i| {
         domain[i] = Fr.fromInteger(i);
     }
-    break :blk domain;
+    break :domain_elements domain;
 };
 
-// CRS contains the CRS to be used in IPAs.
+// CRS contains the base pof points for Pedersen Commitments.
 pub const CRS = struct {
     Gs: [DomainSize]Banderwagon,
     Q: Banderwagon,

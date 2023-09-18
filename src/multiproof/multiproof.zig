@@ -3,14 +3,16 @@ const Allocator = std.mem.Allocator;
 const banderwagon = @import("../banderwagon/banderwagon.zig");
 const Banderwagon = banderwagon.Banderwagon;
 const Fr = banderwagon.Fr;
-const LagrangeBasis = @import("../polynomial/lagrange_basis.zig").LagrangeBasis;
+const lagrange_basis = @import("../polynomial/lagrange_basis.zig");
 const Transcript = @import("../ipa/transcript.zig");
 const IPA = @import("../ipa/ipa.zig");
 const crs = @import("../crs/crs.zig");
 const CRS = crs.CRS;
-const PrecomputedWeights = @import("../polynomial/precomputed_weights.zig").PrecomputedWeights;
-const Quotient = @import("quotient.zig");
+const precomputed_weights = @import("../polynomial/precomputed_weights.zig");
 const assert = std.debug.assert;
+
+const LagrangeBasis = lagrange_basis.LagrangeBasis(crs.DomainSize, crs.Domain);
+const PrecomputedWeights = precomputed_weights.PrecomputedWeights(crs.DomainSize, crs.Domain);
 
 //TODO: FIX
 fn varbase_commit(values: []const Fr, elements: []const Banderwagon) Banderwagon {
@@ -38,12 +40,12 @@ const Proof = struct {
 };
 
 const MultiProof = struct {
-    precomp: PrecomputedWeights(crs.DomainSize, crs.Domain),
+    precomp: PrecomputedWeights,
     crs: CRS,
 
     pub fn init(vkt_crs: CRS) MultiProof {
         return MultiProof{
-            .precomp = PrecomputedWeights(crs.DomainSize, crs.Domain).init(),
+            .precomp = PrecomputedWeights.init(),
             .crs = vkt_crs,
         };
     }
@@ -71,9 +73,9 @@ const MultiProof = struct {
         for (queries) |query| {
             const f = query.f;
             const index = query.z;
-            const quotient = try Quotient.compute_quotient_inside_domain(allocator, self.precomp, f, index);
+            const quotient = try self.compute_quotient_inside_domain(f, index);
             for (0..crs.DomainSize) |i| {
-                g[i] = Fr.add(g[i], Fr.mul(power_of_r, quotient.evaluations.items[i]));
+                g[i] = Fr.add(g[i], Fr.mul(power_of_r, quotient.evaluations[i]));
             }
 
             power_of_r = Fr.mul(power_of_r, r);
@@ -96,7 +98,7 @@ const MultiProof = struct {
             for (0..crs.DomainSize) |i| {
                 h[i] = Fr.add(
                     h[i],
-                    Fr.mul(Fr.mul(power_of_r, f.evaluations.items[i]), denominator_inv),
+                    Fr.mul(Fr.mul(power_of_r, f.evaluations[i]), denominator_inv),
                 );
             }
 
@@ -195,6 +197,34 @@ const MultiProof = struct {
         };
         return IPA.check_ipa_proof(allocator, self.crs, transcript, &query);
     }
+
+    pub fn compute_quotient_inside_domain(self: MultiProof, f: LagrangeBasis, index: Fr) !LagrangeBasis {
+        const inverses = self.precomp.domain_inverses;
+        const Aprime_domain = self.precomp.Aprime_DOMAIN;
+        const Aprime_domain_inv = self.precomp.Aprime_DOMAIN_inv;
+
+        const indexU256 = index.toInteger();
+        // TODO: assert.
+        if (indexU256 >= crs.DomainSize) {
+            return error.IndexOutOfDomain;
+        }
+        // This cast is safe since we checked above.
+        const indexInt = @as(u8, @intCast(indexU256));
+
+        var q = [_]Fr{Fr.zero()} ** crs.DomainSize;
+        const y = f.evaluations[indexInt];
+        for (0..crs.DomainSize) |i| {
+            if (i != indexInt) {
+                q[i] = Fr.mul(Fr.sub(f.evaluations[i], y), inverses[i - indexInt]);
+                q[indexInt] = Fr.add(
+                    q[indexInt],
+                    Fr.mul(Fr.mul(Fr.mul(Fr.sub(f.evaluations[i], y), inverses[crs.DomainSize + i - indexInt]), Aprime_domain[indexInt]), Aprime_domain_inv[i]),
+                );
+            }
+        }
+
+        return LagrangeBasis.init(q);
+    }
 };
 
 test "basic" {
@@ -287,13 +317,13 @@ test "basic" {
     }
 
     const query_a = ProverQuery{
-        .f = try LagrangeBasis.init(allocator, &fs[0], &domain),
+        .f = LagrangeBasis.init(fs[0]),
         .C = Cs[0],
         .z = zs[0],
         .y = ys[0],
     };
     const query_b = ProverQuery{
-        .f = try LagrangeBasis.init(allocator, &fs[1], &domain),
+        .f = LagrangeBasis.init(fs[1]),
         .C = Cs[1],
         .z = zs[1],
         .y = ys[1],
