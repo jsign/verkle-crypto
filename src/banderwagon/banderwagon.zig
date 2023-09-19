@@ -1,6 +1,5 @@
 const std = @import("std");
 const Bandersnatch = @import("../bandersnatch/bandersnatch.zig");
-// TODO: try to avoid this dependency?
 const Fp = Bandersnatch.Fp;
 const AffinePoint = Bandersnatch.AffinePoint;
 const ExtendedPoint = Bandersnatch.ExtendedPoint;
@@ -10,20 +9,19 @@ const ArrayList = std.ArrayList;
 // scalar field size of the Bandersnatch primer-ordered subgroup.
 pub const Fr = Bandersnatch.Fr;
 
-// TODO(2): Rename to Element?
-pub const Banderwagon = struct {
+pub const Element = struct {
     pub const BytesSize = 32;
 
     point: ExtendedPoint,
 
     // initUnsafe is used to create a Banderwagon from a serialized point from a trusted source.
-    pub fn initUnsafe(bytes: [BytesSize]u8) Banderwagon {
-        return Banderwagon{ .point = ExtendedPoint.initUnsafe(bytes) };
+    pub fn initUnsafe(bytes: [BytesSize]u8) Element {
+        return Element{ .point = ExtendedPoint.initUnsafe(bytes) };
     }
 
     // fromBytes deserializes an element from a byte array.
     // The spec serialization is the X coordinate in big endian form.
-    pub fn fromBytes(bytes: [BytesSize]u8) !Banderwagon {
+    pub fn fromBytes(bytes: [BytesSize]u8) !Element {
         var bytes_le = bytes;
         std.mem.reverse(u8, &bytes_le);
         const x = Fp.fromBytes(bytes_le); // TODO: reject if bytes are not canonical?
@@ -33,11 +31,11 @@ pub const Banderwagon = struct {
         }
         const y = try AffinePoint.getYCoordinate(x, true);
 
-        return Banderwagon{ .point = ExtendedPoint.initUnsafe(x, y) };
+        return Element{ .point = ExtendedPoint.initUnsafe(x, y) };
     }
 
     // equal returns true if a == b.
-    pub fn equal(a: Banderwagon, b: Banderwagon) bool {
+    pub fn equal(a: Element, b: Element) bool {
         const x1 = a.point.x;
         const y1 = a.point.y;
         const x2 = b.point.x;
@@ -57,23 +55,23 @@ pub const Banderwagon = struct {
     }
 
     // generator returns the generator of the Banderwagon group.
-    pub fn generator() Banderwagon {
+    pub fn generator() Element {
         return .{ .point = ExtendedPoint.generator() };
     }
 
     // add adds two elements of the Banderwagon group.
-    pub fn add(self: *Banderwagon, p: Banderwagon, q: Banderwagon) void {
+    pub fn add(self: *Element, p: Element, q: Element) void {
         self.point = ExtendedPoint.add(p.point, q.point);
     }
 
     // sub subtracts two elements of the Banderwagon group.
-    pub fn sub(self: *Banderwagon, p: Banderwagon, q: Banderwagon) void {
+    pub fn sub(self: *Element, p: Element, q: Element) void {
         self.point = ExtendedPoint.sub(p.point, q.point);
     }
 
     // TODO: tests.
     // mapToScalarField maps a Banderwagon point to the scalar field.
-    pub fn mapToScalarField(self: Banderwagon) [Fr.BytesSize]u8 {
+    pub fn mapToScalarField(self: Element) [Fr.BytesSize]u8 {
         const y_inv = self.point.y.inv().?;
         const base_bytes = Fp.mul(self.point.x, y_inv).toBytes();
 
@@ -81,7 +79,7 @@ pub const Banderwagon = struct {
     }
 
     // toBytes serializes an element to a byte array.
-    pub fn toBytes(self: Banderwagon) [BytesSize]u8 {
+    pub fn toBytes(self: Element) [BytesSize]u8 {
         const affine = self.point.toAffine();
         var x = affine.x;
         if (!affine.y.lexographicallyLargest()) {
@@ -95,35 +93,35 @@ pub const Banderwagon = struct {
     }
 
     // double doubles an element of the Banderwagon group.
-    pub fn double(self: *Banderwagon, p: Banderwagon) void {
+    pub fn double(self: *Element, p: Element) void {
         self.point = p.point.double();
     }
 
     // scalarMul multiplies an element of the Banderwagon group by a scalar.
-    pub fn scalarMul(element: Banderwagon, scalar: Fr) Banderwagon {
-        return Banderwagon{
+    pub fn scalarMul(element: Element, scalar: Fr) Element {
+        return Element{
             .point = ExtendedPoint.scalarMul(element.point, scalar),
         };
     }
 
     // identity returns the identity element of the Banderwagon group.
-    pub fn identity() Banderwagon {
-        return Banderwagon{ .point = ExtendedPoint.identity() };
+    pub fn identity() Element {
+        return Element{ .point = ExtendedPoint.identity() };
     }
 
     // msm computes the multi-scalar multiplication of scalars and points.
-    pub fn msm(points: []const Banderwagon, scalars: []const Fr) Banderwagon {
+    pub fn msm(points: []const Element, scalars: []const Fr) Element {
         std.debug.assert(scalars.len == points.len);
 
         // TODO: optimize!
-        var res = Banderwagon.identity();
+        var res = Element.identity();
         for (scalars, points) |scalar, point| {
             res.add(res, point.scalarMul(scalar));
         }
         return res;
     }
 
-    fn isOnCurve(self: Banderwagon) bool {
+    fn isOnCurve(self: Element) bool {
         return self.point.toAffine().isOnCurve();
     }
 
@@ -136,9 +134,9 @@ pub const Banderwagon = struct {
         return res.legendre();
     }
 
-    fn twoTorsionPoint() Banderwagon {
+    fn twoTorsionPoint() Element {
         const point = ExtendedPoint.init(Fp.zero(), Fp.one().neg()) catch unreachable;
-        return Banderwagon{ .point = point };
+        return Element{ .point = point };
     }
 };
 
@@ -163,8 +161,8 @@ test "serialize smoke" {
         "00f29b4f3255e318438f0a31e058e4c081085426adb0479f14c64985d0b956e0",
         "3fa4384b2fa0ecc3c0582223602921daaa893a97b64bdf94dcaa504e8b7b9e5f",
     };
-    var points: [expected_bit_strings.len]Banderwagon = undefined;
-    var point = Banderwagon.generator();
+    var points: [expected_bit_strings.len]Element = undefined;
+    var point = Element.generator();
 
     // Check that encoding algorithm gives expected results
     for (expected_bit_strings, 0..) |bit_string, i| {
@@ -181,7 +179,7 @@ test "serialize smoke" {
 
         var byts: [32]u8 = undefined;
         _ = try std.fmt.hexToBytes(&byts, bit_string);
-        const decoded_point = try Banderwagon.fromBytes(byts);
+        const decoded_point = try Element.fromBytes(byts);
         try std.testing.expect(decoded_point.equal(expected_point));
     }
 }
@@ -189,10 +187,10 @@ test "serialize smoke" {
 test "two torsion" {
     // two points which differ by the order two point (0,-1) should be
     // considered the same
-    const gen = Banderwagon.generator();
-    const two_torsion = Banderwagon.twoTorsionPoint();
+    const gen = Element.generator();
+    const two_torsion = Element.twoTorsionPoint();
 
-    var result = Banderwagon.identity();
+    var result = Element.identity();
     result.add(gen, two_torsion);
 
     try std.testing.expect(result.equal(gen));

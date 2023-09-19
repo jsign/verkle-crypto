@@ -20,7 +20,6 @@ test "fields" {
 }
 
 test "ipa" {
-    _ = @import("ipa/common.zig");
     _ = @import("ipa/transcript.zig");
     _ = @import("ipa/ipa.zig");
 }

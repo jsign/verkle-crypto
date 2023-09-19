@@ -1,7 +1,7 @@
 const std = @import("std");
 const Allocator = std.mem.Allocator;
 const banderwagon = @import("../banderwagon/banderwagon.zig");
-const Banderwagon = banderwagon.Banderwagon;
+const Element = banderwagon.Element;
 const Fr = banderwagon.Fr;
 const lagrange_basis = @import("../polynomial/lagrange_basis.zig");
 const Transcript = @import("../ipa/transcript.zig");
@@ -15,21 +15,21 @@ const LagrangeBasis = lagrange_basis.LagrangeBasis(crs.DomainSize, crs.Domain);
 const PrecomputedWeights = precomputed_weights.PrecomputedWeights(crs.DomainSize, crs.Domain);
 
 //TODO: FIX
-fn varbase_commit(values: []const Fr, elements: []const Banderwagon) Banderwagon {
-    return Banderwagon.msm(elements, values);
+fn varbase_commit(values: []const Fr, elements: []const Element) Element {
+    return Element.msm(elements, values);
 }
 
 // We could store the polynomial once and just gather the queries for
 // that polynomial. This way is in-efficient, however it's easier to read
 const ProverQuery = struct {
     f: LagrangeBasis,
-    C: Banderwagon,
+    C: Element,
     z: Fr,
     y: Fr,
 };
 
 const VerifierQuery = struct {
-    C: Banderwagon,
+    C: Element,
     z: Fr,
     y: Fr,
 };
@@ -37,7 +37,7 @@ const VerifierQuery = struct {
 const Proof = struct {
     // TODO
     ipa: ipa.IPA(crs.DomainSize).IPAProof,
-    D: Banderwagon,
+    D: Element,
 };
 
 const MultiProof = struct {
@@ -118,18 +118,18 @@ const MultiProof = struct {
         const E = CRS.commit(self.crs, h);
         transcript.appendPoint(E, "E");
 
-        var ipa_commitment: Banderwagon = undefined;
+        var ipa_commitment: Element = undefined;
         ipa_commitment.sub(E, D);
 
         const polynomial = h_minus_g;
-        const input_point = t;
-        const input_point_vector = self.precomp.barycentricFormulaConstants(input_point);
+        const eval_point = t;
+        const input_point_vector = self.precomp.barycentricFormulaConstants(eval_point);
 
         var query = IPA.ProverQuery{
-            .polynomial = polynomial,
             .commitment = ipa_commitment,
-            .point = input_point,
-            .point_evaluations = input_point_vector,
+            .A = polynomial,
+            .B = input_point_vector,
+            .eval_point = eval_point,
         };
         const proof_res = IPA.createProof(self.crs, transcript, query);
 
@@ -174,7 +174,7 @@ const MultiProof = struct {
         var power_of_r = Fr.one();
 
         var E_coefficients = try allocator.alloc(Fr, queries.len);
-        var Cs = try allocator.alloc(Banderwagon, queries.len);
+        var Cs = try allocator.alloc(Element, queries.len);
         for (queries, 0..) |query, i| {
             Cs[i] = query.C;
             const z = @as(u8, @intCast(query.z.toInteger()));
@@ -190,17 +190,17 @@ const MultiProof = struct {
 
         // Step 3 (Check IPA proofs)
         const y = g_2_of_t;
-        var ipa_commitment: Banderwagon = undefined;
+        var ipa_commitment: Element = undefined;
         ipa_commitment.sub(E, D);
-        const input_point = t;
+        const eval_point = t;
         const output_point = y;
-        const input_point_vector = self.precomp.barycentricFormulaConstants(input_point);
+        const input_point_vector = self.precomp.barycentricFormulaConstants(eval_point);
 
         const query = IPA.VerifierQuery{
             .commitment = ipa_commitment,
-            .point = input_point,
-            .point_evaluations = input_point_vector,
-            .output_point = output_point,
+            .B = input_point_vector,
+            .eval_point = eval_point,
+            .result = output_point,
             .proof = ipa_proof,
         };
         return IPA.verifyProof(self.crs, transcript, query);
@@ -314,7 +314,7 @@ test "basic" {
     const zs = [_]Fr{ Fr.zero(), Fr.zero() };
     const ys = [_]Fr{ Fr.fromInteger(1), Fr.fromInteger(32) };
     const fs = [_][256]Fr{ poly_eval_a, poly_eval_b };
-    const Cs = [_]Banderwagon{ C_a, C_b };
+    const Cs = [_]Element{ C_a, C_b };
 
     var domain: [256]Fr = undefined;
     for (0..domain.len) |i| {

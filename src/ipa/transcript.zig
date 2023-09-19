@@ -1,8 +1,8 @@
 const std = @import("std");
 const sha256 = std.crypto.hash.sha2.Sha256;
 const banderwagon = @import("../banderwagon/banderwagon.zig");
-const Banderwagon = banderwagon.Banderwagon;
 const Fr = banderwagon.Fr;
+const Element = banderwagon.Element;
 
 state: sha256,
 
@@ -31,7 +31,7 @@ pub fn appendScalar(self: *Transcript, scalar: Fr, label: []const u8) void {
     self.appendBytes(&bytes, label);
 }
 
-pub fn appendPoint(self: *Transcript, point: Banderwagon, label: []const u8) void {
+pub fn appendPoint(self: *Transcript, point: Element, label: []const u8) void {
     const point_as_bytes = point.toBytes();
     self.appendBytes(&point_as_bytes, label);
 }
@@ -151,7 +151,7 @@ test "test vector 4" {
     // Test that appending points is consistent across implementations
     var transcript = Transcript.init("simple_protocol");
 
-    const generator = Banderwagon.generator();
+    const generator = Element.generator();
 
     transcript.appendPoint(generator, "generator");
     const challenge = transcript.challengeScalar("simple_challenge");

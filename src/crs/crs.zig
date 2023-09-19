@@ -1,7 +1,7 @@
 const std = @import("std");
 const sha256 = std.crypto.hash.sha2.Sha256;
 const banderwagon = @import("../banderwagon/banderwagon.zig");
-const Banderwagon = banderwagon.Banderwagon;
+const Element = banderwagon.Element;
 const Fr = banderwagon.Fr;
 
 // DomainSize is the size of the domain.
@@ -20,27 +20,27 @@ pub const Domain: [DomainSize]Fr = domain_elements: {
 
 // CRS contains the base pof points for Pedersen Commitments.
 pub const CRS = struct {
-    Gs: [DomainSize]Banderwagon,
-    Q: Banderwagon,
+    Gs: [DomainSize]Element,
+    Q: Element,
 
     pub fn init() CRS {
         return CRS{
             .Gs = deserialize_vkt_points(),
-            .Q = Banderwagon.generator(),
+            .Q = Element.generator(),
         };
     }
 
-    pub fn commit(crs: CRS, values: [DomainSize]Fr) Banderwagon {
-        return Banderwagon.msm(&crs.Gs, &values);
+    pub fn commit(crs: CRS, values: [DomainSize]Fr) Element {
+        return Element.msm(&crs.Gs, &values);
     }
 };
 
-fn deserialize_vkt_points() [DomainSize]Banderwagon {
-    var points: [crs_points.len]Banderwagon = undefined;
+fn deserialize_vkt_points() [DomainSize]Element {
+    var points: [crs_points.len]Element = undefined;
     for (crs_points, 0..) |serialized_point, i| {
         var g_be_bytes: [32]u8 = undefined;
         _ = std.fmt.hexToBytes(&g_be_bytes, serialized_point) catch unreachable;
-        points[i] = Banderwagon.fromBytes(g_be_bytes) catch unreachable;
+        points[i] = Element.fromBytes(g_be_bytes) catch unreachable;
     }
     return points;
 }
@@ -68,7 +68,7 @@ test "crs is consistent" {
 
 test "Gs cannot contain the generator" {
     const crs = CRS.init();
-    const generator = Banderwagon.generator();
+    const generator = Element.generator();
     for (crs.Gs) |point| {
         try std.testing.expect(!generator.equal(point));
     }
