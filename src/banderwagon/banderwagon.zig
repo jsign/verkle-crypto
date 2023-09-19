@@ -5,7 +5,6 @@ const Fp = Bandersnatch.Fp;
 const AffinePoint = Bandersnatch.AffinePoint;
 const ExtendedPoint = Bandersnatch.ExtendedPoint;
 const ArrayList = std.ArrayList;
-const allocator_test = std.testing.allocator;
 
 // Fr is the scalar field of the Banderwgaon group, which matches with the
 // scalar field size of the Bandersnatch primer-ordered subgroup.
@@ -181,22 +180,21 @@ test "serialize smoke" {
         "00f29b4f3255e318438f0a31e058e4c081085426adb0479f14c64985d0b956e0",
         "3fa4384b2fa0ecc3c0582223602921daaa893a97b64bdf94dcaa504e8b7b9e5f",
     };
-    var points = try ArrayList(Banderwagon).initCapacity(allocator_test, expected_bit_strings.len);
-    defer points.deinit();
+    var points: [expected_bit_strings.len]Banderwagon = undefined;
     var point = Banderwagon.generator();
 
     // Check that encoding algorithm gives expected results
-    for (expected_bit_strings) |bit_string| {
+    for (expected_bit_strings, 0..) |bit_string, i| {
         const byts = std.fmt.bytesToHex(point.to_bytes(), std.fmt.Case.lower);
         try std.testing.expectEqualSlices(u8, bit_string, &byts);
 
-        points.appendAssumeCapacity(point);
+        points[i] = point;
         point.double(point);
     }
 
     // Check that decoding algorithm is correct
     for (expected_bit_strings, 0..) |bit_string, i| {
-        const expected_point = points.items[i];
+        const expected_point = points[i];
 
         var byts: [32]u8 = undefined;
         _ = try std.fmt.hexToBytes(&byts, bit_string);
