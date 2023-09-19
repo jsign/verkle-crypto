@@ -18,7 +18,7 @@ const sqrtParam_BitMask = (1 << sqrtParam_BlockSize) - 1; // bitmask to pick up 
 //
 // This means that it is a 32-i'th primitive root of unitity, obtained by repeatedly squaring a 2^32th primitive root of unity [DyadicRootOfUnity_fe].
 const sqrtPrecomp_PrimitiveDyadicRoots: [BaseField2Adicity + 1]feType_SquareRoot = blk: {
-    @setEvalBranchQuota(100_000);
+    @setEvalBranchQuota(35_000);
 
     var ret: [BaseField2Adicity + 1]feType_SquareRoot = undefined;
     ret[0] = Fp.fromInteger(10238227357739495823651030575849232062558860180284477541189508159991286009131);
@@ -42,7 +42,7 @@ const sqrtPrecomp_ReconstructionDyadicRoot: feType_SquareRoot = sqrtPrecomp_Prim
 //
 // Note: accessed through sqrtAlg_getPrecomputedRootOfUnity
 const sqrtPrecomp_PrecomputedBlocks = blk: {
-    @setEvalBranchQuota(1_000_000);
+    @setEvalBranchQuota(750_000);
 
     var blocks: [sqrtParam_Blocks][1 << sqrtParam_BlockSize]feType_SquareRoot = undefined;
     for (0..sqrtParam_Blocks) |i| {
@@ -60,7 +60,7 @@ const sqrtPrecomp_PrecomputedBlocks = blk: {
 // sqrtPrecomp_dlogLUT is a lookup table used to implement the map sqrtPrecompt_reconstructionDyadicRoot^a -> -a
 const sqrtPrecomp_dlogLUT_item = struct { key: u16, value: usize };
 const sqrtPrecomp_dlogLUT: [256]sqrtPrecomp_dlogLUT_item = blk: {
-    @setEvalBranchQuota(1_000_000);
+    @setEvalBranchQuota(300_000);
 
     const LUTSize = 1 << sqrtParam_BlockSize; // 256
     var ret: [256]sqrtPrecomp_dlogLUT_item = undefined;

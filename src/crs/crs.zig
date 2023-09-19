@@ -9,10 +9,11 @@ pub const DomainSize = 256;
 
 // Domain is an array with the domain elements.
 pub const Domain: [DomainSize]Fr = domain_elements: {
-    @setEvalBranchQuota(1_000_000);
+    @setEvalBranchQuota(40_000);
     var domain: [DomainSize]Fr = undefined;
-    for (0..DomainSize) |i| {
-        domain[i] = Fr.fromInteger(i);
+    domain[0] = Fr.fromInteger(0);
+    for (1..DomainSize) |i| {
+        domain[i] = Fr.add(domain[i - 1], Fr.one());
     }
     break :domain_elements domain;
 };

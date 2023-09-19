@@ -53,11 +53,9 @@ const MultiProof = struct {
 
     fn make_multiproof(
         self: MultiProof,
-        allocator: Allocator,
         transcript: *Transcript,
         queries: []const ProverQuery,
     ) !Proof {
-        _ = allocator;
         // TODO
         const IPA = ipa.IPA(crs.DomainSize);
 
@@ -338,7 +336,7 @@ test "basic" {
     const multiproof = MultiProof.init(vkt_crs);
 
     var prover_transcript = Transcript.init("test");
-    const proof = try multiproof.make_multiproof(allocator, &prover_transcript, &[_]ProverQuery{ query_a, query_b });
+    const proof = try multiproof.make_multiproof(&prover_transcript, &[_]ProverQuery{ query_a, query_b });
 
     // Lets check the state of the transcript by squeezing out another challenge
     const p_challenge = prover_transcript.challengeScalar("state");
