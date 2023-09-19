@@ -138,11 +138,15 @@ const MultiProof = struct {
 
     fn check_multiproof(
         self: MultiProof,
-        allocator: Allocator,
+        base_allocator: Allocator,
         transcript: *Transcript,
         queries: []const VerifierQuery,
         proof: Proof,
     ) !bool {
+        var arena = std.heap.ArenaAllocator.init(base_allocator);
+        defer arena.deinit();
+        var allocator = arena.allocator();
+
         // TODO
         const IPA = ipa.IPA(crs.DomainSize);
 
@@ -232,10 +236,7 @@ const MultiProof = struct {
 };
 
 test "basic" {
-    var allocator2 = std.testing.allocator;
-    var arena = std.heap.ArenaAllocator.init(allocator2);
-    defer arena.deinit();
-    var allocator = arena.allocator();
+    var allocator = std.testing.allocator;
 
     // Polynomials in lagrange basis
     const poly_eval_a = [_]Fr{
