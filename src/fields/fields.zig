@@ -12,25 +12,25 @@ pub const BandersnatchFields = struct {
 
 fn Field(comptime F: type, comptime mod: u256) type {
     return struct {
-        pub const BYTE_LEN = 32;
+        pub const BytesSize = 32;
         pub const MODULO = mod;
         pub const Q_MIN_ONE_DIV_2 = (MODULO - 1) / 2;
 
         comptime {
-            std.debug.assert(@bitSizeOf(u256) == BYTE_LEN * 8);
+            std.debug.assert(@bitSizeOf(u256) == BytesSize * 8);
         }
 
         const Self = @This();
         const baseZero = val: {
             var bz: F.MontgomeryDomainFieldElement = undefined;
-            F.fromBytes(&bz, [_]u8{0} ** BYTE_LEN);
+            F.fromBytes(&bz, [_]u8{0} ** BytesSize);
             break :val Self{ .fe = bz };
         };
 
         fe: F.MontgomeryDomainFieldElement,
 
         pub fn fromInteger(num: u256) Self {
-            var lbe: [BYTE_LEN]u8 = [_]u8{0} ** BYTE_LEN;
+            var lbe: [BytesSize]u8 = [_]u8{0} ** BytesSize;
             std.mem.writeInt(u256, lbe[0..], num % MODULO, std.builtin.Endian.Little);
 
             var nonMont: F.NonMontgomeryDomainFieldElement = undefined;
@@ -54,7 +54,7 @@ fn Field(comptime F: type, comptime mod: u256) type {
             return oneValue;
         }
 
-        pub fn from_bytes(bytes: [BYTE_LEN]u8) Self {
+        pub fn fromBytes(bytes: [BytesSize]u8) Self {
             var non_mont: F.NonMontgomeryDomainFieldElement = undefined;
             inline for (0..4) |i| {
                 non_mont[i] = std.mem.readIntSlice(u64, bytes[i * 8 .. (i + 1) * 8], std.builtin.Endian.Little);
@@ -65,10 +65,10 @@ fn Field(comptime F: type, comptime mod: u256) type {
             return ret;
         }
 
-        pub fn to_bytes(self: Self) [BYTE_LEN]u8 {
+        pub fn toBytes(self: Self) [BytesSize]u8 {
             var non_mont: F.NonMontgomeryDomainFieldElement = undefined;
             F.fromMontgomery(&non_mont, self.fe);
-            var ret: [BYTE_LEN]u8 = undefined;
+            var ret: [BytesSize]u8 = undefined;
             inline for (0..4) |i| {
                 std.mem.writeIntSlice(u64, ret[i * 8 .. (i + 1) * 8], non_mont[i], std.builtin.Endian.Little);
             }
@@ -112,11 +112,11 @@ fn Field(comptime F: type, comptime mod: u256) type {
         }
 
         pub fn isZero(self: Self) bool {
-            return self.eq(baseZero);
+            return self.equal(baseZero);
         }
 
         pub fn isOne(self: Self) bool {
-            return self.eq(one());
+            return self.equal(one());
         }
 
         pub fn square(self: Self) Self {
@@ -180,7 +180,7 @@ fn Field(comptime F: type, comptime mod: u256) type {
             return self.mul(denInv);
         }
 
-        pub fn eq(self: Self, other: Self) bool {
+        pub fn equal(self: Self, other: Self) bool {
             return std.mem.eql(u64, &self.fe, &other.fe);
         }
 
@@ -188,7 +188,7 @@ fn Field(comptime F: type, comptime mod: u256) type {
             var non_mont: F.NonMontgomeryDomainFieldElement = undefined;
             F.fromMontgomery(&non_mont, self.fe);
 
-            var bytes: [BYTE_LEN]u8 = [_]u8{0} ** BYTE_LEN;
+            var bytes: [BytesSize]u8 = [_]u8{0} ** BytesSize;
             F.toBytes(&bytes, non_mont);
 
             return std.mem.readInt(u256, &bytes, std.builtin.Endian.Little);
@@ -305,7 +305,7 @@ fn Field(comptime F: type, comptime mod: u256) type {
             const ls = a.pow((MODULO - 1) / 2);
 
             const moduloMinusOne = comptime fromInteger(MODULO - 1);
-            if (ls.eq(moduloMinusOne)) {
+            if (ls.equal(moduloMinusOne)) {
                 return -1;
             } else if (ls.isZero()) {
                 return 0;

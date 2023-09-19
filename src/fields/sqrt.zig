@@ -319,16 +319,16 @@ test "correctness" {
         var regen_new = Fp.mul(sqrt_fast.?, sqrt_fast.?);
 
         // Check the obvious: regenNew should be equal to the original element.
-        try std.testing.expect(regen_new.eq(a));
+        try std.testing.expect(regen_new.equal(a));
 
         // Calculate the sqrt with the original gnark code.
         const sqrt_slow = Fp.sqrt_slow(a);
         var regen_slow = Fp.mul(sqrt_slow.?, sqrt_slow.?);
-        try std.testing.expect(regen_slow.eq(a));
+        try std.testing.expect(regen_slow.equal(a));
 
         // Check that both sqrt's are equal, *considering* the case that they have opposite signs.
         // We need to do that since both algorithm can return either the positive or negative sqrt,
         // which is fine.
-        try std.testing.expect(sqrt_fast.?.eq(sqrt_slow.?) or sqrt_fast.?.neg().eq(sqrt_slow.?));
+        try std.testing.expect(sqrt_fast.?.equal(sqrt_slow.?) or sqrt_fast.?.neg().equal(sqrt_slow.?));
     }
 }

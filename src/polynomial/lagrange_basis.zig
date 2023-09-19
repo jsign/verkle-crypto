@@ -51,7 +51,7 @@ pub fn LagrangeBasis(comptime domain_size: comptime_int, comptime eval_domain: [
 
         pub fn eq(lhs: Self, rhs: Self) bool {
             for (lhs.evaluations, 0..) |lhs_i, i| {
-                if (!lhs_i.eq(rhs.evaluations[i])) {
+                if (!lhs_i.equal(rhs.evaluations[i])) {
                     return false;
                 }
             }

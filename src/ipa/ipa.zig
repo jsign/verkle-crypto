@@ -188,7 +188,7 @@ pub fn IPA(comptime VECTOR_LENGTH: comptime_int) type {
             var got_commitment: Banderwagon = undefined;
             got_commitment.add(Banderwagon.scalarMul(G_0, proof.a), Banderwagon.scalarMul(q, Fr.mul(proof.a, b_0)));
 
-            return current_commitment.eq(got_commitment);
+            return current_commitment.equal(got_commitment);
         }
 
         // foldScalars computes a[i] = a[i] + b[i] * challenge
@@ -234,7 +234,7 @@ test "basic proof" {
     const xcrs = crs.CRS.init();
     const commitment = xcrs.commit(lagrange_poly);
 
-    const expected_comm = std.fmt.bytesToHex(commitment.to_bytes(), std.fmt.Case.lower);
+    const expected_comm = std.fmt.bytesToHex(commitment.toBytes(), std.fmt.Case.lower);
     try std.testing.expectEqualStrings("1b9dff8f5ebbac250d291dfe90e36283a227c64b113c37f1bfb9e7a743cdb128", &expected_comm);
 
     var prover_transcript = Transcript.init("test");
@@ -243,7 +243,7 @@ test "basic proof" {
     const input_point = Fr.fromInteger(2101);
     const b = weights.barycentricFormulaConstants(input_point);
     const output_point_check = common.innerProduct(&lagrange_poly, &b);
-    const output_point_check_hex = std.fmt.bytesToHex(output_point_check.to_bytes(), std.fmt.Case.lower);
+    const output_point_check_hex = std.fmt.bytesToHex(output_point_check.toBytes(), std.fmt.Case.lower);
     try std.testing.expectEqualStrings("4a353e70b03c89f161de002e8713beec0d740a5e20722fd5bd68b30540a33208", &output_point_check_hex);
 
     var query = ipa.ProverQuery{
@@ -257,7 +257,7 @@ test "basic proof" {
 
     // Lets check the state of the transcript by squeezing out another challenge
     const p_challenge = prover_transcript.challengeScalar("state");
-    const p_challenge_hex = std.fmt.bytesToHex(p_challenge.to_bytes(), std.fmt.Case.lower);
+    const p_challenge_hex = std.fmt.bytesToHex(p_challenge.toBytes(), std.fmt.Case.lower);
     try std.testing.expectEqualStrings("0a81881cbfd7d7197a54ebd67ed6a68b5867f3c783706675b34ece43e85e7306", &p_challenge_hex);
 
     // Verify the proof.

@@ -344,7 +344,7 @@ test "basic" {
 
     try std.testing.expectEqualStrings(
         "eee8a80357ff74b766eba39db90797d022e8d6dee426ded71234241be504d519",
-        &std.fmt.bytesToHex(p_challenge.to_bytes(), std.fmt.Case.lower),
+        &std.fmt.bytesToHex(p_challenge.toBytes(), std.fmt.Case.lower),
     );
 
     var verifier_transcript = Transcript.init("test");
@@ -355,5 +355,5 @@ test "basic" {
     try std.testing.expect(ok);
 
     const v_challenge = verifier_transcript.challengeScalar("state");
-    try std.testing.expectEqualSlices(u8, &p_challenge.to_bytes(), &v_challenge.to_bytes());
+    try std.testing.expectEqualSlices(u8, &p_challenge.toBytes(), &v_challenge.toBytes());
 }

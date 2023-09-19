@@ -51,7 +51,7 @@ test "crs is consistent" {
 
     // Reserialize Gs points and check they match with the original representation.
     for (crs.Gs, 0..) |g, i| {
-        const got_point = std.fmt.bytesToHex(g.to_bytes(), std.fmt.Case.lower);
+        const got_point = std.fmt.bytesToHex(g.toBytes(), std.fmt.Case.lower);
         const expected_point = crs_points[i];
         try std.testing.expect(std.mem.eql(u8, &got_point, expected_point));
     }
@@ -59,7 +59,7 @@ test "crs is consistent" {
     // Check all points have the expected fingerprint.
     var hasher = sha256.init(.{});
     for (crs.Gs) |point| {
-        hasher.update(&point.to_bytes());
+        hasher.update(&point.toBytes());
     }
     const result = hasher.finalResult();
     const result_hex = std.fmt.bytesToHex(result, std.fmt.Case.lower);
@@ -70,7 +70,7 @@ test "Gs cannot contain the generator" {
     const crs = CRS.init();
     const generator = Banderwagon.generator();
     for (crs.Gs) |point| {
-        try std.testing.expect(!generator.eq(point));
+        try std.testing.expect(!generator.equal(point));
     }
 }
 

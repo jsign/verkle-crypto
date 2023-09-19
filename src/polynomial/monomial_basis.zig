@@ -54,7 +54,7 @@ pub fn MonomialBasis(comptime PolyDegree: comptime_int) type {
 
         pub fn eq(self: Self, other: Self) bool {
             for (self.coeffs, other.coeffs) |a, b| {
-                if (!a.eq(b)) return false;
+                if (!a.equal(b)) return false;
             }
             return true;
         }

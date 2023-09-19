@@ -50,7 +50,7 @@ pub fn isZero(self: ExtendedPoint) bool {
     // Identity is {x=0, y=1, t = 0, z =1}
     // The equivalence class is therefore is {x=0, y=k, t = 0, z=k} for all k where k!=0
     const condition_1 = self.x.isZero();
-    const condition_2 = self.y.eq(self.z);
+    const condition_2 = self.y.equal(self.z);
     const condition_3 = !self.y.isZero();
     const condition_4 = self.t.isZero();
 
@@ -66,10 +66,9 @@ pub fn equal(p: ExtendedPoint, q: ExtendedPoint) bool {
         return false;
     }
 
-    return (p.x.mul(q.z).eq(p.z.mul(q.x))) and (p.y.mul(q.z).eq(q.y.mul(p.z)));
+    return (p.x.mul(q.z).equal(p.z.mul(q.x))) and (p.y.mul(q.z).equal(q.y.mul(p.z)));
 }
 
-// TODO(jsign): switch to *const.
 pub fn add(p: ExtendedPoint, q: ExtendedPoint) ExtendedPoint {
     // See "Twisted Edwards Curves Revisited" (https: // eprint.iacr.org/2008/522.pdf)
     // by Huseyin Hisil, Kenneth Koon-Ho Wong, Gary Carter, and Ed Dawson
@@ -114,7 +113,7 @@ pub fn sub(p: ExtendedPoint, q: ExtendedPoint) ExtendedPoint {
 }
 
 pub fn double(self: ExtendedPoint) ExtendedPoint {
-    // TODO(improv): can replace this with dedicated doubling formula
+    // TODO: can replace this with dedicated doubling formula
     return add(self, self);
 }
 

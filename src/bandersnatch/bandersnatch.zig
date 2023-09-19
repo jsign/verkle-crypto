@@ -84,14 +84,14 @@ test "one" {
     const oneFromInteger = Fp.fromInteger(1);
     const oneFromAPI = Fp.one();
 
-    try std.testing.expect(oneFromInteger.eq(oneFromAPI));
+    try std.testing.expect(oneFromInteger.equal(oneFromAPI));
 }
 
 test "zero" {
     const zeroFromInteger = Fp.fromInteger(0);
     const zeroFromAPI = Fp.zero();
 
-    try std.testing.expect(zeroFromInteger.eq(zeroFromAPI));
+    try std.testing.expect(zeroFromInteger.equal(zeroFromAPI));
 }
 
 test "lexographically largest" {
@@ -106,11 +106,11 @@ test "from and to bytes" {
     const cases = [_]Fp{ Fp.fromInteger(0), Fp.fromInteger(1), Fp.fromInteger(Fp.Q_MIN_ONE_DIV_2), Fp.fromInteger(Fp.MODULO - 1) };
 
     for (cases) |fe| {
-        const bytes = fe.to_bytes();
-        const fe2 = Fp.from_bytes(bytes);
-        try std.testing.expect(fe.eq(fe2));
+        const bytes = fe.toBytes();
+        const fe2 = Fp.fromBytes(bytes);
+        try std.testing.expect(fe.equal(fe2));
 
-        const bytes2 = fe2.to_bytes();
+        const bytes2 = fe2.toBytes();
         try std.testing.expectEqualSlices(u8, &bytes, &bytes2);
     }
 }
@@ -124,11 +124,11 @@ test "to integer" {
 test "add sub mul neg" {
     const got = Fp.fromInteger(10).mul(Fp.fromInteger(20)).add(Fp.fromInteger(30)).sub(Fp.fromInteger(40)).add(Fp.fromInteger(Fp.MODULO));
     const want = Fp.fromInteger(190);
-    try std.testing.expect(got.eq(want));
+    try std.testing.expect(got.equal(want));
 
     const gotneg = got.neg();
     const wantneg = Fp.fromInteger(Fp.MODULO - 190);
-    try std.testing.expect(gotneg.eq(wantneg));
+    try std.testing.expect(gotneg.equal(wantneg));
 }
 
 test "inv" {
@@ -140,7 +140,7 @@ test "inv" {
         const one = T.one();
         const cases = [_]T{ T.fromInteger(2), T.fromInteger(42), T.fromInteger(T.MODULO - 1) };
         for (cases) |fe| {
-            try std.testing.expect(fe.mul(fe.inv().?).eq(one));
+            try std.testing.expect(fe.mul(fe.inv().?).equal(one));
         }
     }
 }
@@ -158,5 +158,5 @@ test "sqrt" {
     const b_sqrt = b.sqrt().?;
     const b_sqrt_sqr = b_sqrt.mul(b_sqrt);
 
-    try std.testing.expect(b.eq(b_sqrt_sqr));
+    try std.testing.expect(b.equal(b_sqrt_sqr));
 }

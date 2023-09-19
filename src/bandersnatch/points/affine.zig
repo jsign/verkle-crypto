@@ -74,7 +74,7 @@ pub fn double(p: AffinePoint) AffinePoint {
 }
 
 pub fn eq(self: AffinePoint, q: AffinePoint) bool {
-    return self.x.eq(q.x) and self.y.eq(q.y);
+    return self.x.equal(q.x) and self.y.equal(q.y);
 }
 
 pub fn identity() AffinePoint {
@@ -106,7 +106,7 @@ pub fn to_bytes(self: AffinePoint) [32]u8 {
         mask = mCompressedNegative;
     }
 
-    var xBytes = self.x.to_bytes();
+    var xBytes = self.x.toBytes();
     xBytes[31] |= mask;
 
     return xBytes;
@@ -124,7 +124,7 @@ pub fn isOnCurve(self: AffinePoint) bool {
     const rhs = one.add(dxy_sq);
     const lhs = a_x_sq.add(y_sq);
 
-    return lhs.eq(rhs);
+    return lhs.equal(rhs);
 }
 
 pub fn getYCoordinate(x: Fp, returnPositiveY: bool) !Fp {

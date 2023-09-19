@@ -16,8 +16,8 @@ pub fn init(label: []const u8) Transcript {
     };
 }
 // Convert bytes to scalar field
-fn bytesToField(bytes: [Fr.BYTE_LEN]u8) Fr {
-    return Fr.from_bytes(bytes);
+fn bytesToField(bytes: [Fr.BytesSize]u8) Fr {
+    return Fr.fromBytes(bytes);
 }
 
 fn appendBytes(self: *Transcript, message: []const u8, label: []const u8) void {
@@ -27,12 +27,12 @@ fn appendBytes(self: *Transcript, message: []const u8, label: []const u8) void {
 
 pub fn appendScalar(self: *Transcript, scalar: Fr, label: []const u8) void {
     // Serialize the scalar in little endian
-    const bytes = scalar.to_bytes();
+    const bytes = scalar.toBytes();
     self.appendBytes(&bytes, label);
 }
 
 pub fn appendPoint(self: *Transcript, point: Banderwagon, label: []const u8) void {
-    const point_as_bytes = point.to_bytes();
+    const point_as_bytes = point.toBytes();
     self.appendBytes(&point_as_bytes, label);
 }
 
@@ -105,7 +105,7 @@ test "test vector" {
     const first_challenge = transcript.challengeScalar("f");
     const second_challenge = transcript.challengeScalar("f");
 
-    try std.testing.expect(!first_challenge.eq(second_challenge));
+    try std.testing.expect(!first_challenge.equal(second_challenge));
 }
 
 test "test vector 1" {
@@ -113,7 +113,7 @@ test "test vector 1" {
     var transcript = Transcript.init("simple_protocol");
     const challenge = transcript.challengeScalar("simple_challenge");
 
-    const got_hex = std.fmt.bytesToHex(challenge.to_bytes(), std.fmt.Case.lower);
+    const got_hex = std.fmt.bytesToHex(challenge.toBytes(), std.fmt.Case.lower);
     try std.testing.expectEqualStrings("c2aa02607cbdf5595f00ee0dd94a2bbff0bed6a2bf8452ada9011eadb538d003", &got_hex);
 }
 
@@ -126,7 +126,7 @@ test "test vector 2" {
     transcript.appendScalar(scalar, "five again");
 
     const challenge = transcript.challengeScalar("simple_challenge");
-    const got_hex = std.fmt.bytesToHex(challenge.to_bytes(), std.fmt.Case.lower);
+    const got_hex = std.fmt.bytesToHex(challenge.toBytes(), std.fmt.Case.lower);
     try std.testing.expectEqualStrings("498732b694a8ae1622d4a9347535be589e4aee6999ffc0181d13fe9e4d037b0b", &got_hex);
 }
 
@@ -143,7 +143,7 @@ test "test vector 3" {
 
     const challenge = transcript.challengeScalar("simple_challenge");
 
-    const got_hex = std.fmt.bytesToHex(challenge.to_bytes(), std.fmt.Case.lower);
+    const got_hex = std.fmt.bytesToHex(challenge.toBytes(), std.fmt.Case.lower);
     try std.testing.expectEqualStrings("14f59938e9e9b1389e74311a464f45d3d88d8ac96adf1c1129ac466de088d618", &got_hex);
 }
 
@@ -155,6 +155,6 @@ test "test vector 4" {
 
     transcript.appendPoint(generator, "generator");
     const challenge = transcript.challengeScalar("simple_challenge");
-    const got_hex = std.fmt.bytesToHex(challenge.to_bytes(), std.fmt.Case.lower);
+    const got_hex = std.fmt.bytesToHex(challenge.toBytes(), std.fmt.Case.lower);
     try std.testing.expectEqualStrings("8c2dafe7c0aabfa9ed542bb2cbf0568399ae794fc44fdfd7dff6cc0e6144921c", &got_hex);
 }

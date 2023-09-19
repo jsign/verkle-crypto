@@ -19,5 +19,5 @@ test "inner product smoke" {
     // Expected result should be 1*10 + 2*12 + 3*13 + 4*14 + 5*15
     const expected_result = Fr.fromInteger(204);
     const got_result = innerProduct(&a, &b);
-    try std.testing.expect(got_result.eq(expected_result));
+    try std.testing.expect(got_result.equal(expected_result));
 }

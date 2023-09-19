@@ -10,44 +10,38 @@ const ArrayList = std.ArrayList;
 // scalar field size of the Bandersnatch primer-ordered subgroup.
 pub const Fr = Bandersnatch.Fr;
 
-// TODO(jsign): move to separate module.
+// TODO(2): Rename to Element?
 pub const Banderwagon = struct {
+    pub const BytesSize = 32;
+
     point: ExtendedPoint,
 
-    // TODO(jsign): 32 -> const.
-    pub fn initUnsafe(serlialized: [32]u8) Banderwagon {
-        return Banderwagon{ .point = ExtendedPoint.initUnsafe(serlialized) };
+    // initUnsafe is used to create a Banderwagon from a serialized point from a trusted source.
+    pub fn initUnsafe(bytes: [BytesSize]u8) Banderwagon {
+        return Banderwagon{ .point = ExtendedPoint.initUnsafe(bytes) };
     }
 
-    // TODO(jsign): 32 -> const.
-    pub fn fromBytes(serialised_bytes_big_endian: [32]u8) !Banderwagon {
-        var bytes_le: [32]u8 = undefined;
-        std.mem.copy(u8, &bytes_le, &serialised_bytes_big_endian);
+    // fromBytes deserializes an element from a byte array.
+    // The spec serialization is the X coordinate in big endian form.
+    pub fn fromBytes(bytes: [BytesSize]u8) !Banderwagon {
+        var bytes_le = bytes;
         std.mem.reverse(u8, &bytes_le);
+        const x = Fp.fromBytes(bytes_le); // TODO: reject if bytes are not canonical?
 
-        // TODO(jsign): Should -> "Will error if the bytes are not canonical"
-        const x = Fp.from_bytes(bytes_le);
-
-        // Will error if the point is not on the curve
-        const y = try AffinePoint.getYCoordinate(x, true);
-
-        // Will error if x coordinate not a quadratic residue
         if (subgroupCheck(x) != 1) {
             return error.NotInSubgroup;
         }
+        const y = try AffinePoint.getYCoordinate(x, true);
 
         return Banderwagon{ .point = ExtendedPoint.initUnsafe(x, y) };
     }
 
-    pub fn eq(self: Banderwagon, other: Banderwagon) bool {
-        // The equals method is different for the quotient group
-        //
-        // Check for the (0,0) point, which is _possible_
-        // given that you do not need to use the constructor to construct points
-        const x1 = self.point.x;
-        const y1 = self.point.y;
-        const x2 = other.point.x;
-        const y2 = other.point.y;
+    // equal returns true if a == b.
+    pub fn equal(a: Banderwagon, b: Banderwagon) bool {
+        const x1 = a.point.x;
+        const y1 = a.point.y;
+        const x2 = b.point.x;
+        const y2 = b.point.y;
 
         if (x1.isZero() and y1.isZero()) {
             return false;
@@ -59,40 +53,81 @@ pub const Banderwagon = struct {
         const lhs = Fp.mul(x1, y2);
         const rhs = Fp.mul(x2, y1);
 
-        return Fp.eq(lhs, rhs);
+        return Fp.equal(lhs, rhs);
     }
 
+    // generator returns the generator of the Banderwagon group.
     pub fn generator() Banderwagon {
         return .{ .point = ExtendedPoint.generator() };
     }
 
-    pub fn neg(self: Banderwagon, p: Banderwagon) Banderwagon {
-        self.point = -p.point;
-        return self;
-    }
-
+    // add adds two elements of the Banderwagon group.
     pub fn add(self: *Banderwagon, p: Banderwagon, q: Banderwagon) void {
         self.point = ExtendedPoint.add(p.point, q.point);
     }
 
+    // sub subtracts two elements of the Banderwagon group.
     pub fn sub(self: *Banderwagon, p: Banderwagon, q: Banderwagon) void {
         self.point = ExtendedPoint.sub(p.point, q.point);
     }
 
-    pub fn mapToFieldBytes(self: Banderwagon) [32]u8 {
-        return self.map_to_field().to_bytes();
+    // TODO: tests.
+    // mapToScalarField maps a Banderwagon point to the scalar field.
+    pub fn mapToScalarField(self: Banderwagon) [Fr.BytesSize]u8 {
+        const y_inv = self.point.y.inv().?;
+        const base_bytes = Fp.mul(self.point.x, y_inv).toBytes();
+
+        return Fr.fromBytes(base_bytes);
     }
 
-    pub fn map_to_field(self: Banderwagon) Fp {
-        // The map to field function for banderwagon is x/y
-        const x = self.point.x.dup();
-        const y = self.point.y.dup();
+    // toBytes serializes an element to a byte array.
+    pub fn toBytes(self: Banderwagon) [BytesSize]u8 {
+        const affine = self.point.toAffine();
+        var x = affine.x;
+        if (!affine.y.lexographicallyLargest()) {
+            x = Fp.neg(x);
+        }
 
-        return x / y;
+        var bytes = x.toBytes();
+        std.mem.reverse(u8, &bytes);
+
+        return bytes;
     }
 
-    pub fn subgroupCheck(x: Fp) i2 {
-        // Compute 1 - aX^2 and check its legendre symbol
+    // double doubles an element of the Banderwagon group.
+    pub fn double(self: *Banderwagon, p: Banderwagon) void {
+        self.point = p.point.double();
+    }
+
+    // scalarMul multiplies an element of the Banderwagon group by a scalar.
+    pub fn scalarMul(element: Banderwagon, scalar: Fr) Banderwagon {
+        return Banderwagon{
+            .point = ExtendedPoint.scalarMul(element.point, scalar),
+        };
+    }
+
+    // identity returns the identity element of the Banderwagon group.
+    pub fn identity() Banderwagon {
+        return Banderwagon{ .point = ExtendedPoint.identity() };
+    }
+
+    // msm computes the multi-scalar multiplication of scalars and points.
+    pub fn msm(points: []const Banderwagon, scalars: []const Fr) Banderwagon {
+        std.debug.assert(scalars.len == points.len);
+
+        // TODO: optimize!
+        var res = Banderwagon.identity();
+        for (scalars, points) |scalar, point| {
+            res.add(res, point.scalarMul(scalar));
+        }
+        return res;
+    }
+
+    fn isOnCurve(self: Banderwagon) bool {
+        return self.point.toAffine().isOnCurve();
+    }
+
+    fn subgroupCheck(x: Fp) i2 {
         var res = x.mul(x);
         res = res.mul(Bandersnatch.A);
         res = res.neg();
@@ -101,61 +136,9 @@ pub const Banderwagon = struct {
         return res.legendre();
     }
 
-    pub fn to_bytes(self: Banderwagon) [32]u8 {
-        const affine = self.point.toAffine();
-        var x = affine.x;
-        if (!affine.y.lexographicallyLargest()) {
-            x = Fp.neg(x);
-        }
-
-        // Little endian.
-        var bytes = x.to_bytes();
-        // Big endian.
-        std.mem.reverse(u8, &bytes);
-
-        return bytes;
-    }
-
-    pub fn double(self: *Banderwagon, p: Banderwagon) void {
-        self.point = p.point.double();
-    }
-
-    pub fn isOnCurve(self: Banderwagon) bool {
-        return self.point.toAffine().isOnCurve();
-    }
-
-    pub fn dup(self: Banderwagon) Banderwagon {
-        return Banderwagon{
-            .point = self.point,
-        };
-    }
-
-    // TODO(jsign): weird api.
-    pub fn scalarMul(element: Banderwagon, scalar: Fr) Banderwagon {
-        return Banderwagon{
-            .point = ExtendedPoint.scalarMul(element.point, scalar),
-        };
-    }
-
-    pub fn identity() Banderwagon {
-        return Banderwagon{ .point = ExtendedPoint.identity() };
-    }
-
-    pub fn twoTorsionPoint() Banderwagon {
+    fn twoTorsionPoint() Banderwagon {
         const point = ExtendedPoint.init(Fp.zero(), Fp.one().neg()) catch unreachable;
         return Banderwagon{ .point = point };
-    }
-
-    // Multi scalar multiplication
-    pub fn msm(points: []const Banderwagon, scalars: []const Fr) Banderwagon {
-        // TODO: assert params lengths.
-        var res = Banderwagon.identity();
-
-        for (scalars, points) |scalar, point| {
-            const partial_res = point.scalarMul(scalar);
-            res.add(res, partial_res);
-        }
-        return res;
     }
 };
 
@@ -185,7 +168,7 @@ test "serialize smoke" {
 
     // Check that encoding algorithm gives expected results
     for (expected_bit_strings, 0..) |bit_string, i| {
-        const byts = std.fmt.bytesToHex(point.to_bytes(), std.fmt.Case.lower);
+        const byts = std.fmt.bytesToHex(point.toBytes(), std.fmt.Case.lower);
         try std.testing.expectEqualSlices(u8, bit_string, &byts);
 
         points[i] = point;
@@ -199,7 +182,7 @@ test "serialize smoke" {
         var byts: [32]u8 = undefined;
         _ = try std.fmt.hexToBytes(&byts, bit_string);
         const decoded_point = try Banderwagon.fromBytes(byts);
-        try std.testing.expect(decoded_point.eq(expected_point));
+        try std.testing.expect(decoded_point.equal(expected_point));
     }
 }
 
@@ -212,5 +195,5 @@ test "two torsion" {
     var result = Banderwagon.identity();
     result.add(gen, two_torsion);
 
-    try std.testing.expect(result.eq(gen));
+    try std.testing.expect(result.equal(gen));
 }
