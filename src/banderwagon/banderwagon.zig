@@ -135,6 +135,9 @@ pub fn msm(points: []const Element, scalars: []const Fr) Element {
     // TODO: optimize!
     var res = Element.identity();
     for (scalars, points) |scalar, point| {
+        if (scalar.isZero()) {
+            continue;
+        }
         res.add(res, point.scalarMul(scalar));
     }
     return res;
