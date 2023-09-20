@@ -6,12 +6,12 @@ const banderwagon = @import("banderwagon/banderwagon.zig");
 const Fr = banderwagon.Fr;
 const multiproof = @import("multiproof/multiproof.zig");
 const polynomials = @import("polynomial/lagrange_basis.zig");
+const ipa = @import("ipa/ipa.zig");
 const Transcript = @import("ipa/transcript.zig");
-
-const LagrangeBasis = polynomials.LagrangeBasis(crs.DomainSize, crs.Domain);
 
 pub fn main() !void {
     benchFields();
+    try benchIPAs();
     try benchMultiproofs();
 }
 
@@ -43,7 +43,68 @@ fn benchFields() void {
     std.debug.print("takes {}µs\n", .{@divTrunc((std.time.microTimestamp() - start), (N))});
 }
 
+fn benchIPAs() !void {
+    const PrecomputedWeights = @import("polynomial/precomputed_weights.zig").PrecomputedWeights(crs.DomainSize, crs.Domain);
+
+    std.debug.print("Setting up IPA benchmark...\n", .{});
+    const N = 100;
+
+    var weights = PrecomputedWeights.init();
+    const xcrs = crs.CRS.init();
+    const IPA = ipa.IPA(crs.DomainSize);
+
+    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    defer {
+        const deinit_status = gpa.deinit();
+        if (deinit_status == .leak) std.testing.expect(false) catch @panic("memory leak");
+    }
+    var allocator = gpa.allocator();
+
+    var prover_queries: []IPA.ProverQuery = try allocator.alloc(IPA.ProverQuery, N);
+    for (0..prover_queries.len) |i| {
+        for (0..prover_queries[i].A.len) |j| {
+            prover_queries[i].A[j] = Fr.fromInteger(i + j + 0x424242);
+        }
+        prover_queries[i].commitment = xcrs.commit(prover_queries[i].A);
+        prover_queries[i].eval_point = Fr.fromInteger((i + 0x414039) % 256);
+        prover_queries[i].B = weights.barycentricFormulaConstants(prover_queries[i].eval_point);
+    }
+
+    var accum_prover: i64 = 0;
+    var accum_verifier: i64 = 0;
+    for (0..N) |i| {
+        // Prover.
+        var prover_transcript = Transcript.init("test");
+        var start = std.time.milliTimestamp();
+        const proof = IPA.createProof(xcrs, &prover_transcript, prover_queries[i]);
+        accum_prover += std.time.milliTimestamp() - start;
+
+        // Verifier.
+        start = std.time.milliTimestamp();
+        var verifier_transcript = Transcript.init("test");
+        const verifier_query = IPA.VerifierQuery{
+            .commitment = prover_queries[i].commitment,
+            .B = prover_queries[i].B,
+            .eval_point = prover_queries[i].eval_point,
+            .result = proof.result,
+            .proof = proof.proof,
+        };
+        const ok = IPA.verifyProof(xcrs, &verifier_transcript, verifier_query);
+        std.debug.assert(ok);
+        accum_verifier += std.time.milliTimestamp() - start;
+    }
+    std.debug.print(
+        "\tproving takes {}ms, verifying takes {}ms\n",
+        .{
+            @divTrunc((accum_prover), (N)),
+            @divTrunc((accum_verifier), (N)),
+        },
+    );
+}
+
 fn benchMultiproofs() !void {
+    const LagrangeBasis = polynomials.LagrangeBasis(crs.DomainSize, crs.Domain);
+
     std.debug.print("Setting up multiproofs benchmark...\n", .{});
     const N = 50;
     const openings = [_]u16{ 1, 10, 100, 1_000 };
@@ -63,16 +124,14 @@ fn benchMultiproofs() !void {
     }
     var allocator = gpa.allocator();
 
-    var eval_magic_offset: u64 = 0x424242;
-    var z_magic_offset: u64 = 0x414039;
     var vec_openings = try allocator.alloc(PolyOpeningSetup, openings[openings.len - 1]);
     defer allocator.free(vec_openings);
 
     for (0..vec_openings.len) |i| {
         for (0..vec_openings[i].poly_evaluations.len) |j| {
-            vec_openings[i].poly_evaluations[j] = Fr.fromInteger(i + j + eval_magic_offset);
+            vec_openings[i].poly_evaluations[j] = Fr.fromInteger(i + j + 0x424242);
         }
-        vec_openings[i].z = Fr.fromInteger((i + z_magic_offset) % 256);
+        vec_openings[i].z = Fr.fromInteger((i + 0x414039) % 256);
         vec_openings[i].C = crs.CRS.commit(vkt_crs, vec_openings[i].poly_evaluations);
     }
 
