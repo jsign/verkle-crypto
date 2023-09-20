@@ -188,43 +188,27 @@ pub fn sqrtAlg_ComputeRelevantPowers(
     squareRootCandidate: *feType_SquareRoot,
     rootOfUnity: *feType_SquareRoot,
 ) void {
-
     // hand-crafted sliding window-type algorithm with window-size 5
     // Note that we precompute and use z^255 multiple times (even though it's not size 5)
     // and some windows actually overlap(!)
 
-    var z2: feType_SquareRoot = undefined;
-    var z3: feType_SquareRoot = undefined;
-    var z7: feType_SquareRoot = undefined;
-    var z6: feType_SquareRoot = undefined;
-    var z9: feType_SquareRoot = undefined;
-    var z11: feType_SquareRoot = undefined;
-    var z13: feType_SquareRoot = undefined;
-    var z19: feType_SquareRoot = undefined;
-    var z21: feType_SquareRoot = undefined;
-    var z25: feType_SquareRoot = undefined;
-    var z27: feType_SquareRoot = undefined;
-    var z29: feType_SquareRoot = undefined;
-    var z31: feType_SquareRoot = undefined;
-    var z255: feType_SquareRoot = undefined;
-    var acc: feType_SquareRoot = undefined;
-    z2 = Fp.square(z); // 0b10
-    z3 = Fp.mul(z, z2); // 0b11
-    z6 = Fp.square(z3); // 0b110
-    z7 = Fp.mul(z, z6); // 0b111
-    z9 = Fp.mul(z7, z2); // 0b1001
-    z11 = Fp.mul(z9, z2); // 0b1011
-    z13 = Fp.mul(z11, z2); // 0b1101
-    z19 = Fp.mul(z13, z6); // 0b10011
-    z21 = Fp.mul(z2, z19); // 0b10101
-    z25 = Fp.mul(z19, z6); // 0b11001
-    z27 = Fp.mul(z25, z2); // 0b11011
-    z29 = Fp.mul(z27, z2); // 0b11101
-    z31 = Fp.mul(z29, z2); // 0b11111
-    acc = Fp.mul(z27, z29); // 56
+    const z2 = Fp.square(z); // 0b10
+    const z3 = Fp.mul(z, z2); // 0b11
+    const z6 = Fp.square(z3); // 0b110
+    const z7 = Fp.mul(z, z6); // 0b111
+    const z9 = Fp.mul(z7, z2); // 0b1001
+    const z11 = Fp.mul(z9, z2); // 0b1011
+    const z13 = Fp.mul(z11, z2); // 0b1101
+    const z19 = Fp.mul(z13, z6); // 0b10011
+    const z21 = Fp.mul(z2, z19); // 0b10101
+    const z25 = Fp.mul(z19, z6); // 0b11001
+    const z27 = Fp.mul(z25, z2); // 0b11011
+    const z29 = Fp.mul(z27, z2); // 0b11101
+    const z31 = Fp.mul(z29, z2); // 0b11111
+    var acc = Fp.mul(z27, z29); // 56
     acc = Fp.square(acc); // 112
     acc = Fp.square(acc); // 224
-    z255 = Fp.mul(acc, z31); // 0b11111111 = 255
+    const z255 = Fp.mul(acc, z31); // 0b11111111 = 255
     acc = Fp.square(acc); // 448
     acc = Fp.square(acc); // 896
     acc = Fp.mul(acc, z31); // 0b1110011111 = 927
