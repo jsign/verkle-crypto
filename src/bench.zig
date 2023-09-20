@@ -10,9 +10,10 @@ const ipa = @import("ipa/ipa.zig");
 const Transcript = @import("ipa/transcript.zig");
 
 pub fn main() !void {
-    benchFields();
-    try benchIPAs();
-    try benchMultiproofs();
+    // benchFields();
+    try benchPedersenHash();
+    // try benchIPAs();
+    // try benchMultiproofs();
 }
 
 fn benchFields() void {
@@ -41,6 +42,41 @@ fn benchFields() void {
         _ = Fp.sqrt(fps[i]).?;
     }
     std.debug.print("takes {}µs\n", .{@divTrunc((std.time.microTimestamp() - start), (N))});
+}
+
+fn benchPedersenHash() !void {
+    std.debug.print("Benchmarking Pedersen hashing...\n", .{});
+    const xcrs = crs.CRS.init();
+    const N = 200;
+
+    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    defer {
+        const deinit_status = gpa.deinit();
+        if (deinit_status == .leak) std.testing.expect(false) catch @panic("memory leak");
+    }
+    var allocator = gpa.allocator();
+
+    var vec_len: usize = 1;
+    while (vec_len <= 256) : (vec_len <<= 1) {
+        std.debug.print("\twith {} elements... ", .{vec_len});
+
+        var vecs = try allocator.alloc([crs.DomainSize]Fr, N);
+        defer allocator.free(vecs);
+        for (0..vecs.len) |i| {
+            for (0..vec_len) |j| {
+                vecs[i][j] = Fr.fromInteger(i + j + 0x424242);
+            }
+            for (vec_len..vecs[i].len) |j| {
+                vecs[i][j] = Fr.zero();
+            }
+        }
+
+        var start = std.time.microTimestamp();
+        for (0..N) |i| {
+            _ = xcrs.commit(vecs[i]);
+        }
+        std.debug.print("takes {}µs\n", .{@divTrunc((std.time.microTimestamp() - start), (N))});
+    }
 }
 
 fn benchIPAs() !void {
