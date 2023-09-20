@@ -2,8 +2,8 @@ const std = @import("std");
 const assert = std.debug.assert;
 const crs = @import("../crs/crs.zig");
 const Fr = @import("../banderwagon/banderwagon.zig").Fr;
-const MonomialBasis = @import("monomial_basis.zig").MonomialBasis;
-const LagrangeBasis = @import("lagrange_basis.zig").LagrangeBasis; // TODO(jsign): reconsider having the wrapper.
+const monomial_basis = @import("monomial_basis.zig");
+const lagrange_basis = @import("lagrange_basis.zig");
 
 pub fn PrecomputedWeights(
     comptime DomainSize: comptime_int,
@@ -12,13 +12,13 @@ pub fn PrecomputedWeights(
     return struct {
         const Self = @This();
         // TODO: We don't _need_ to store the vanishing polynomial
-        // TODO: we only need to store its derivative and whenever we need to evaluate
-        // TODO: the vanishing polynomial, it can be done via the domain
+        //       we only need to store its derivative and whenever we need to evaluate
+        //       the vanishing polynomial, it can be done via the domain
 
         // Vanishing polynomial
-        A: MonomialBasis(DomainSize),
+        A: monomial_basis.MonomialBasis(DomainSize),
         // Derivative of the vanishing polynomial
-        Aprime: MonomialBasis(DomainSize),
+        Aprime: monomial_basis.MonomialBasis(DomainSize),
         // Aprime evaluated on the domain
         Aprime_DOMAIN: [crs.DomainSize]Fr,
         // Aprime evaluated on the domain and then inverted
@@ -27,7 +27,7 @@ pub fn PrecomputedWeights(
         domain_inverses: [2 * crs.DomainSize]Fr,
 
         pub fn init() Self {
-            const _A = MonomialBasis(DomainSize).vanishingPoly(domain);
+            const _A = monomial_basis.MonomialBasis(DomainSize).vanishingPoly(domain);
             const _Aprime = _A.formalDerivative();
             var _Aprime_domain: [DomainSize]Fr = undefined;
             var _Aprime_domain_inv: [DomainSize]Fr = undefined;
@@ -39,7 +39,6 @@ pub fn PrecomputedWeights(
 
             // This is not fully correct as the first element will be the inverse of 0
             // We keep it this way for now because it is what the research code did
-            // TODO: refactor this to make it more readable
             // If domain size is 4 for example, the output would be:
             // [1/0, 1/1, 1/2, 1/3, -1/3, -1/2,-1/1]
             var inverses: [2 * DomainSize]Fr = undefined;
@@ -76,13 +75,4 @@ pub fn PrecomputedWeights(
             return r;
         }
     };
-}
-
-fn checkDomainIsContinousAndIncreasing(domain: []Fr) bool {
-    for (1..domain.len) |i| {
-        if (!Fr.sub(domain[i], domain[i - 1]).isOne()) {
-            return false;
-        }
-    }
-    return true;
 }

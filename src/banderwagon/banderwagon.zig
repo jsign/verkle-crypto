@@ -109,18 +109,6 @@ pub const Element = struct {
         return Element{ .point = ExtendedPoint.identity() };
     }
 
-    // msm computes the multi-scalar multiplication of scalars and points.
-    pub fn msm(points: []const Element, scalars: []const Fr) Element {
-        std.debug.assert(scalars.len == points.len);
-
-        // TODO: optimize!
-        var res = Element.identity();
-        for (scalars, points) |scalar, point| {
-            res.add(res, point.scalarMul(scalar));
-        }
-        return res;
-    }
-
     fn isOnCurve(self: Element) bool {
         return self.point.toAffine().isOnCurve();
     }
@@ -139,6 +127,18 @@ pub const Element = struct {
         return Element{ .point = point };
     }
 };
+
+// msm computes the multi-scalar multiplication of scalars and points.
+pub fn msm(points: []const Element, scalars: []const Fr) Element {
+    std.debug.assert(scalars.len == points.len);
+
+    // TODO: optimize!
+    var res = Element.identity();
+    for (scalars, points) |scalar, point| {
+        res.add(res, point.scalarMul(scalar));
+    }
+    return res;
+}
 
 test "serialize smoke" {
     // Each successive point is a doubling of the previous one

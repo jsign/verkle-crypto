@@ -31,7 +31,7 @@ pub const CRS = struct {
     }
 
     pub fn commit(crs: CRS, values: [DomainSize]Fr) Element {
-        return Element.msm(&crs.Gs, &values);
+        return banderwagon.msm(&crs.Gs, &values);
     }
 };
 

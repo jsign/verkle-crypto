@@ -74,9 +74,9 @@ pub fn IPA(comptime VectorLength: comptime_int) type {
                 const z_R = innerProduct(a_L, b_R);
 
                 var C_L: Element = undefined;
-                C_L.add(Element.msm(basis[0..m], a_R), q.scalarMul(z_L));
+                C_L.add(banderwagon.msm(basis[0..m], a_R), q.scalarMul(z_L));
                 var C_R: Element = undefined;
-                C_R.add(Element.msm(basis[m..], a_L), q.scalarMul(z_R));
+                C_R.add(banderwagon.msm(basis[m..], a_L), q.scalarMul(z_R));
 
                 L[step] = C_L;
                 R[step] = C_R;

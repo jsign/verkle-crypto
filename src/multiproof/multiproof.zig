@@ -9,15 +9,10 @@ const ipa = @import("../ipa/ipa.zig");
 const crs = @import("../crs/crs.zig");
 const CRS = crs.CRS;
 const precomputed_weights = @import("../polynomial/precomputed_weights.zig");
-const assert = std.debug.assert;
 
+const IPA = ipa.IPA(crs.DomainSize);
 const LagrangeBasis = lagrange_basis.LagrangeBasis(crs.DomainSize, crs.Domain);
 const PrecomputedWeights = precomputed_weights.PrecomputedWeights(crs.DomainSize, crs.Domain);
-
-//TODO: FIX
-fn varbase_commit(values: []const Fr, elements: []const Element) Element {
-    return Element.msm(elements, values);
-}
 
 // We could store the polynomial once and just gather the queries for
 // that polynomial. This way is in-efficient, however it's easier to read
@@ -35,8 +30,7 @@ const VerifierQuery = struct {
 };
 
 const Proof = struct {
-    // TODO
-    ipa: ipa.IPA(crs.DomainSize).IPAProof,
+    ipa: IPA.IPAProof,
     D: Element,
 };
 
@@ -51,14 +45,11 @@ const MultiProof = struct {
         };
     }
 
-    fn make_multiproof(
+    fn createProof(
         self: MultiProof,
         transcript: *Transcript,
         queries: []const ProverQuery,
     ) !Proof {
-        // TODO
-        const IPA = ipa.IPA(crs.DomainSize);
-
         transcript.domainSep("multiproof");
 
         // Add queries into transcript
@@ -76,7 +67,7 @@ const MultiProof = struct {
         for (queries) |query| {
             const f = query.f;
             const index = query.z;
-            const quotient = try self.compute_quotient_inside_domain(f, index);
+            const quotient = self.computeQuotientInsideDomain(f, index);
             for (0..crs.DomainSize) |i| {
                 g[i] = Fr.add(g[i], Fr.mul(power_of_r, quotient.evaluations[i]));
             }
@@ -136,7 +127,7 @@ const MultiProof = struct {
         return Proof{ .ipa = proof_res.proof, .D = D };
     }
 
-    fn check_multiproof(
+    fn verifyProof(
         self: MultiProof,
         base_allocator: Allocator,
         transcript: *Transcript,
@@ -146,9 +137,6 @@ const MultiProof = struct {
         var arena = std.heap.ArenaAllocator.init(base_allocator);
         defer arena.deinit();
         var allocator = arena.allocator();
-
-        // TODO
-        const IPA = ipa.IPA(crs.DomainSize);
 
         transcript.domainSep("multiproof");
         const D = proof.D;
@@ -185,7 +173,7 @@ const MultiProof = struct {
             power_of_r = Fr.mul(power_of_r, r);
         }
 
-        const E = varbase_commit(E_coefficients, Cs);
+        const E = banderwagon.msm(Cs, E_coefficients);
         transcript.appendPoint(E, "E");
 
         // Step 3 (Check IPA proofs)
@@ -206,17 +194,12 @@ const MultiProof = struct {
         return IPA.verifyProof(self.crs, transcript, query);
     }
 
-    pub fn compute_quotient_inside_domain(self: MultiProof, f: LagrangeBasis, index: Fr) !LagrangeBasis {
+    pub fn computeQuotientInsideDomain(self: MultiProof, f: LagrangeBasis, index: Fr) LagrangeBasis {
         const inverses = self.precomp.domain_inverses;
         const Aprime_domain = self.precomp.Aprime_DOMAIN;
         const Aprime_domain_inv = self.precomp.Aprime_DOMAIN_inv;
 
         const indexU256 = index.toInteger();
-        // TODO: assert.
-        if (indexU256 >= crs.DomainSize) {
-            return error.IndexOutOfDomain;
-        }
-        // This cast is safe since we checked above.
         const indexInt = @as(u8, @intCast(indexU256));
 
         var q = [_]Fr{Fr.zero()} ** crs.DomainSize;
@@ -337,7 +320,7 @@ test "basic" {
     const multiproof = MultiProof.init(vkt_crs);
 
     var prover_transcript = Transcript.init("test");
-    const proof = try multiproof.make_multiproof(&prover_transcript, &[_]ProverQuery{ query_a, query_b });
+    const proof = try multiproof.createProof(&prover_transcript, &[_]ProverQuery{ query_a, query_b });
 
     // Lets check the state of the transcript by squeezing out another challenge
     const p_challenge = prover_transcript.challengeScalar("state");
@@ -350,7 +333,7 @@ test "basic" {
     var verifier_transcript = Transcript.init("test");
     var vquery_a = VerifierQuery{ .C = Cs[0], .z = zs[0], .y = ys[0] };
     var vquery_b = VerifierQuery{ .C = Cs[1], .z = zs[1], .y = ys[1] };
-    const ok = try multiproof.check_multiproof(allocator, &verifier_transcript, &[_]VerifierQuery{ vquery_a, vquery_b }, proof);
+    const ok = try multiproof.verifyProof(allocator, &verifier_transcript, &[_]VerifierQuery{ vquery_a, vquery_b }, proof);
 
     try std.testing.expect(ok);
 

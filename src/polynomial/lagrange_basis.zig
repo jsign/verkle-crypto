@@ -83,7 +83,6 @@ test "add & sub" {
 }
 
 test "mul" {
-    // TODO(jsign): create some helper to do this.
     const domain = comptime [_]Fr{ Fr.fromInteger(0), Fr.fromInteger(1), Fr.fromInteger(2), Fr.fromInteger(3), Fr.fromInteger(4), Fr.fromInteger(5) };
     const TestLagrangeBasis = LagrangeBasis(domain.len, domain);
 
