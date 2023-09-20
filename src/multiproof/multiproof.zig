@@ -14,27 +14,27 @@ const IPA = ipa.IPA(crs.DomainSize);
 const LagrangeBasis = lagrange_basis.LagrangeBasis(crs.DomainSize, crs.Domain);
 const PrecomputedWeights = precomputed_weights.PrecomputedWeights(crs.DomainSize, crs.Domain);
 
-// We could store the polynomial once and just gather the queries for
+// TODO: We could store the polynomial once and just gather the queries for
 // that polynomial. This way is in-efficient, however it's easier to read
-const ProverQuery = struct {
+pub const ProverQuery = struct {
     f: LagrangeBasis,
     C: Element,
     z: Fr,
     y: Fr,
 };
 
-const VerifierQuery = struct {
+pub const VerifierQuery = struct {
     C: Element,
     z: Fr,
     y: Fr,
 };
 
-const Proof = struct {
+pub const Proof = struct {
     ipa: IPA.IPAProof,
     D: Element,
 };
 
-const MultiProof = struct {
+pub const MultiProof = struct {
     precomp: PrecomputedWeights,
     crs: CRS,
 
@@ -45,7 +45,7 @@ const MultiProof = struct {
         };
     }
 
-    fn createProof(
+    pub fn createProof(
         self: MultiProof,
         transcript: *Transcript,
         queries: []const ProverQuery,
@@ -127,7 +127,7 @@ const MultiProof = struct {
         return Proof{ .ipa = proof_res.proof, .D = D };
     }
 
-    fn verifyProof(
+    pub fn verifyProof(
         self: MultiProof,
         base_allocator: Allocator,
         transcript: *Transcript,
@@ -298,11 +298,6 @@ test "basic" {
     const ys = [_]Fr{ Fr.fromInteger(1), Fr.fromInteger(32) };
     const fs = [_][256]Fr{ poly_eval_a, poly_eval_b };
     const Cs = [_]Element{ C_a, C_b };
-
-    var domain: [256]Fr = undefined;
-    for (0..domain.len) |i| {
-        domain[i] = Fr.fromInteger(i);
-    }
 
     const query_a = ProverQuery{
         .f = LagrangeBasis.init(fs[0]),
