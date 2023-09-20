@@ -47,7 +47,7 @@ fn benchIPAs() !void {
     const PrecomputedWeights = @import("polynomial/precomputed_weights.zig").PrecomputedWeights(crs.DomainSize, crs.Domain);
 
     std.debug.print("Setting up IPA benchmark...\n", .{});
-    const N = 100;
+    const N = 500;
 
     var weights = PrecomputedWeights.init();
     const xcrs = crs.CRS.init();
@@ -60,7 +60,7 @@ fn benchIPAs() !void {
     }
     var allocator = gpa.allocator();
 
-    var prover_queries: []IPA.ProverQuery = try allocator.alloc(IPA.ProverQuery, N);
+    var prover_queries: []IPA.ProverQuery = try allocator.alloc(IPA.ProverQuery, 16);
     for (0..prover_queries.len) |i| {
         for (0..prover_queries[i].A.len) |j| {
             prover_queries[i].A[j] = Fr.fromInteger(i + j + 0x424242);
@@ -72,7 +72,8 @@ fn benchIPAs() !void {
 
     var accum_prover: i64 = 0;
     var accum_verifier: i64 = 0;
-    for (0..N) |i| {
+    for (0..N) |j| {
+        const i = j % prover_queries.len;
         // Prover.
         var prover_transcript = Transcript.init("test");
         var start = std.time.milliTimestamp();
