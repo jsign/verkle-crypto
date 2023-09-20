@@ -17,7 +17,7 @@ pub fn main() !void {
 
 fn benchFields() void {
     std.debug.print("Setting up fields benchmark...\n", .{});
-    const N = 10_000;
+    const N = 30_000;
     const fps: [N]Fp = genBaseFieldElements(N);
     var start: i64 = undefined;
 
@@ -46,7 +46,7 @@ fn benchFields() void {
 fn benchMultiproofs() !void {
     std.debug.print("Setting up multiproofs benchmark...\n", .{});
     const N = 50;
-    const openings = [_]u16{ 1, 10, 100, 1_000, 10_000 };
+    const openings = [_]u16{ 1, 10, 100, 1_000 };
 
     const vkt_crs = crs.CRS.init();
 
@@ -79,8 +79,11 @@ fn benchMultiproofs() !void {
     const mproof = multiproof.MultiProof.init(vkt_crs);
     for (openings) |num_openings| {
         std.debug.print("\tBenchmarking {} openings...", .{num_openings});
-        var start = std.time.milliTimestamp();
+
+        var accum_proving: i64 = 0;
+        var accum_verifying: i64 = 0;
         for (0..N) |_| {
+            // Proving.
             var prover_queries = try allocator.alloc(multiproof.ProverQuery, num_openings);
             defer allocator.free(prover_queries);
             for (0..num_openings) |i| {
@@ -92,11 +95,34 @@ fn benchMultiproofs() !void {
                 };
             }
 
+            var start = std.time.milliTimestamp();
             var prover_transcript = Transcript.init("test");
             const proof = try mproof.createProof(&prover_transcript, prover_queries);
-            _ = proof;
+            accum_proving += std.time.milliTimestamp() - start;
+
+            // Verifying.
+            var verifier_transcript = Transcript.init("test");
+            var verifier_queries = try allocator.alloc(multiproof.VerifierQuery, num_openings);
+            defer allocator.free(verifier_queries);
+            for (0..num_openings) |i| {
+                verifier_queries[i] = multiproof.VerifierQuery{
+                    .C = vec_openings[i].C,
+                    .z = vec_openings[i].z,
+                    .y = vec_openings[i].poly_evaluations[@as(usize, @intCast(vec_openings[i].z.toInteger()))],
+                };
+            }
+            start = std.time.milliTimestamp();
+            const ok = try mproof.verifyProof(allocator, &verifier_transcript, verifier_queries, proof);
+            std.debug.assert(ok);
+            accum_verifying += std.time.milliTimestamp() - start;
         }
-        std.debug.print("takes {}ms\n", .{@divTrunc((std.time.milliTimestamp() - start), (N))});
+        std.debug.print(
+            "proving takes {}ms, verifying takes {}ms\n",
+            .{
+                @divTrunc((accum_proving), (N)),
+                @divTrunc((accum_verifying), (N)),
+            },
+        );
     }
 }
 
