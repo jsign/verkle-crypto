@@ -36,8 +36,8 @@ pub const CRS = struct {
 };
 
 fn deserialize_vkt_points() [DomainSize]Element {
-    var points: [crs_points.len]Element = undefined;
-    for (crs_points, 0..) |serialized_point, i| {
+    var points: [vkt_crs_points.len]Element = undefined;
+    for (vkt_crs_points, 0..) |serialized_point, i| {
         var g_be_bytes: [32]u8 = undefined;
         _ = std.fmt.hexToBytes(&g_be_bytes, serialized_point) catch unreachable;
         points[i] = Element.fromBytes(g_be_bytes) catch unreachable;
@@ -47,12 +47,12 @@ fn deserialize_vkt_points() [DomainSize]Element {
 
 test "crs is consistent" {
     const crs = CRS.init();
-    try std.testing.expect(crs.Gs.len == crs_points.len);
+    try std.testing.expect(crs.Gs.len == vkt_crs_points.len);
 
     // Reserialize Gs points and check they match with the original representation.
     for (crs.Gs, 0..) |g, i| {
         const got_point = std.fmt.bytesToHex(g.toBytes(), std.fmt.Case.lower);
-        const expected_point = crs_points[i];
+        const expected_point = vkt_crs_points[i];
         try std.testing.expect(std.mem.eql(u8, &got_point, expected_point));
     }
 
@@ -74,7 +74,7 @@ test "Gs cannot contain the generator" {
     }
 }
 
-const crs_points = [_][]const u8{
+const vkt_crs_points = [_][]const u8{
     "01587ad1336675eb912550ec2a28eb8923b824b490dd2ba82e48f14590a298a0",
     "6c6e607df0723edfff382fa914bfc38136f3300ab2e06fb97007b559fd323b82",
     "326be3bebfd97ed9d0d4ca1b8bc47e036a24b129f1488110b71c2cae1463db8f",
@@ -332,3 +332,7 @@ const crs_points = [_][]const u8{
     "3102a5884d3dce8d94a8cf6d5ab2d3a4c76ec8b00f4554caa68c028aedf5970f",
     "3de2be346b539395b0c0de56a5ccca54a317f1b5c80107b0802af9a62276a4d8",
 };
+
+test "msm" {
+    _ = @import("msm.zig");
+}
