@@ -8,12 +8,13 @@ const multiproof = @import("multiproof/multiproof.zig");
 const polynomials = @import("polynomial/lagrange_basis.zig");
 const ipa = @import("ipa/ipa.zig");
 const Transcript = @import("ipa/transcript.zig");
+const precomp = @import("crs/msm.zig");
 
 pub fn main() !void {
-    // benchFields();
+    benchFields();
     try benchPedersenHash();
-    // try benchIPAs();
-    // try benchMultiproofs();
+    try benchIPAs();
+    try benchMultiproofs();
 }
 
 fn benchFields() void {
@@ -47,7 +48,7 @@ fn benchFields() void {
 fn benchPedersenHash() !void {
     std.debug.print("Benchmarking Pedersen hashing...\n", .{});
     const xcrs = crs.CRS.init();
-    const N = 200;
+    const N = 500;
 
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
     defer {
@@ -55,6 +56,9 @@ fn benchPedersenHash() !void {
         if (deinit_status == .leak) std.testing.expect(false) catch @panic("memory leak");
     }
     var allocator = gpa.allocator();
+
+    var precomp_msm = try precomp.PrecompMSM.init(allocator, &xcrs.Gs, 8);
+    defer precomp_msm.deinit();
 
     var vec_len: usize = 1;
     while (vec_len <= 256) : (vec_len <<= 1) {
@@ -75,7 +79,13 @@ fn benchPedersenHash() !void {
         for (0..N) |i| {
             _ = xcrs.commit(vecs[i]);
         }
-        std.debug.print("takes {}µs\n", .{@divTrunc((std.time.microTimestamp() - start), (N))});
+        std.debug.print(" naive takes {}µs", .{@divTrunc((std.time.microTimestamp() - start), (N))});
+
+        start = std.time.microTimestamp();
+        for (0..N) |i| {
+            _ = try precomp_msm.msm(vecs[i][0..vec_len]);
+        }
+        std.debug.print(", optimized takes {}µs\n", .{@divTrunc((std.time.microTimestamp() - start), (N))});
     }
 }
 

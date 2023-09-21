@@ -4,7 +4,7 @@ const banderwagon = @import("../banderwagon/banderwagon.zig");
 const Element = banderwagon.Element;
 const Fr = banderwagon.Fr;
 
-const PrecompMSM = struct {
+pub const PrecompMSM = struct {
     allocator: Allocator,
     b: usize,
     basis_len: usize,
@@ -47,7 +47,9 @@ const PrecompMSM = struct {
         const num_windows = self.basis_len / self.b;
         var accum = Element.identity();
         for (0..253) |k| {
-            accum.double(accum);
+            if (k > 0) {
+                accum.double(accum);
+            }
             for (0..num_windows) |w| {
                 if (w * self.b < scalars.len) {
                     const window_scalars = scalars[w * self.b ..];
@@ -103,12 +105,8 @@ test "correctness" {
             }
             full_scalars[i] = Fr.zero();
         }
-        std.debug.print("For {} ...", .{msm_length});
         const exp = CRS.commit(full_scalars);
-        std.debug.print("ok", .{});
-
         const got = try precomp.msm(msm_scalars);
-        std.debug.print(" ok\n", .{});
 
         try std.testing.expect(Element.equal(exp, got));
     }
