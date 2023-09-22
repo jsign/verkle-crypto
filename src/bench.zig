@@ -93,7 +93,7 @@ fn benchIPAs() !void {
     const PrecomputedWeights = @import("polynomial/precomputed_weights.zig").PrecomputedWeights(crs.DomainSize, crs.Domain);
 
     std.debug.print("Setting up IPA benchmark...\n", .{});
-    const N = 500;
+    const N = 100;
 
     var weights = PrecomputedWeights.init();
     const xcrs = crs.CRS.init();

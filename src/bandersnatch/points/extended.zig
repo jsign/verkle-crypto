@@ -70,34 +70,15 @@ pub fn equal(p: ExtendedPoint, q: ExtendedPoint) bool {
 }
 
 pub fn add(p: ExtendedPoint, q: ExtendedPoint) ExtendedPoint {
-    // See "Twisted Edwards Curves Revisited" (https: // eprint.iacr.org/2008/522.pdf)
-    // by Huseyin Hisil, Kenneth Koon-Ho Wong, Gary Carter, and Ed Dawson
-    // 3.1 Unified Addition in E^e
-
-    const x1 = p.x;
-    const y1 = p.y;
-    const t1 = p.t;
-    const z1 = p.z;
-
-    const x2 = q.x;
-    const y2 = q.y;
-    const t2 = q.t;
-    const z2 = q.z;
-
-    const a = Fp.mul(x1, x2);
-
-    const b = Fp.mul(y1, y2);
-
-    const c = Fp.mul(Bandersnatch.D, Fp.mul(t1, t2));
-
-    const d = Fp.mul(z1, z2);
-
-    const h = Fp.sub(b, Fp.mul(a, Bandersnatch.A));
-
-    const e = Fp.sub(Fp.sub(Fp.mul(Fp.add(x1, y1), Fp.add(x2, y2)), b), a);
-
+    // https://hyperelliptic.org/EFD/g1p/auto-twisted-extended.html#addition-add-2008-hwcd
+    const a = Fp.mul(p.x, q.x);
+    const b = Fp.mul(p.y, q.y);
+    const c = Fp.mul(Bandersnatch.D, Fp.mul(p.t, q.t));
+    const d = Fp.mul(p.z, q.z);
+    const e = Fp.sub(Fp.sub(Fp.mul(Fp.add(p.x, p.y), Fp.add(q.x, q.y)), a), b);
     const f = Fp.sub(d, c);
     const g = Fp.add(d, c);
+    const h = Fp.sub(b, a.neg().mulBy5());
 
     return ExtendedPoint{
         .x = Fp.mul(e, f),
@@ -105,6 +86,10 @@ pub fn add(p: ExtendedPoint, q: ExtendedPoint) ExtendedPoint {
         .t = Fp.mul(e, h),
         .z = Fp.mul(f, g),
     };
+}
+
+inline fn mulByA(x: Fp) Fp {
+    x.neg().mulBy5();
 }
 
 pub fn sub(p: ExtendedPoint, q: ExtendedPoint) ExtendedPoint {

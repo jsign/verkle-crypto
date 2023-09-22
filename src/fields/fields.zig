@@ -99,9 +99,17 @@ fn Field(comptime F: type, comptime mod: u256) type {
             return Self{ .fe = ret };
         }
 
-        pub inline fn mul(self: Self, other: Self) Self {
+        pub fn mul(self: Self, other: Self) Self {
             var ret: F.MontgomeryDomainFieldElement = undefined;
             F.mul(&ret, self.fe, other.fe);
+            return Self{ .fe = ret };
+        }
+
+        pub fn mulBy5(self: Self) Self {
+            var ret: F.MontgomeryDomainFieldElement = undefined;
+            F.add(&ret, self.fe, self.fe);
+            F.add(&ret, ret, ret);
+            F.add(&ret, ret, self.fe);
             return Self{ .fe = ret };
         }
 
@@ -123,7 +131,7 @@ fn Field(comptime F: type, comptime mod: u256) type {
             return self.mul(self);
         }
 
-        pub inline fn pow2(self: Self, comptime exponent: u8) Self {
+        pub fn pow2(self: Self, comptime exponent: u8) Self {
             var ret = self;
             inline for (exponent) |_| {
                 ret = ret.mul(ret);
@@ -184,7 +192,7 @@ fn Field(comptime F: type, comptime mod: u256) type {
             return std.mem.eql(u64, &self.fe, &other.fe);
         }
 
-        pub inline fn toInteger(self: Self) u256 {
+        pub fn toInteger(self: Self) u256 {
             var non_mont: F.NonMontgomeryDomainFieldElement = undefined;
             F.fromMontgomery(&non_mont, self.fe);
 
