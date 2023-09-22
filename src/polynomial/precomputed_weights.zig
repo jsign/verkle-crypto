@@ -42,9 +42,10 @@ pub fn PrecomputedWeights(
             // If domain size is 4 for example, the output would be:
             // [1/0, 1/1, 1/2, 1/3, -1/3, -1/2,-1/1]
             var inverses: [2 * DomainSize]Fr = undefined;
-            for (0..DomainSize) |d| {
-                inverses[d] = Fr.inv(Fr.fromInteger(d)) orelse Fr.zero(); // It should only happen for 0.
-                inverses[DomainSize + d] = Fr.inv(Fr.fromInteger(Fr.MODULO - d)) orelse Fr.zero();
+            inverses[0] = Fr.zero();
+            for (1..DomainSize) |d| {
+                inverses[d] = Fr.inv(Fr.fromInteger(d)) orelse Fr.zero();
+                inverses[inverses.len - d] = Fr.inv(Fr.fromInteger(Fr.MODULO - d)) orelse Fr.zero();
             }
             return .{
                 .A = _A,

@@ -200,16 +200,22 @@ pub const MultiProof = struct {
         const Aprime_domain_inv = self.precomp.Aprime_DOMAIN_inv;
 
         const indexU256 = index.toInteger();
-        const indexInt = @as(u8, @intCast(indexU256));
+        std.debug.assert(indexU256 < crs.DomainSize);
+        const indexInt = @as(isize, @intCast(indexU256));
 
         var q = [_]Fr{Fr.zero()} ** crs.DomainSize;
-        const y = f.evaluations[indexInt];
+        const y = f.evaluations[@as(usize, @intCast(indexInt))];
         for (0..crs.DomainSize) |i| {
             if (i != indexInt) {
-                q[i] = Fr.mul(Fr.sub(f.evaluations[i], y), inverses[i - indexInt]);
-                q[indexInt] = Fr.add(
-                    q[indexInt],
-                    Fr.mul(Fr.mul(Fr.mul(Fr.sub(f.evaluations[i], y), inverses[crs.DomainSize + i - indexInt]), Aprime_domain[indexInt]), Aprime_domain_inv[i]),
+                const den = @as(isize, @intCast(inverses.len));
+                var num = @as(isize, @intCast(i)) - indexInt;
+                var inv_idx = @mod(num, den);
+                q[i] = Fr.mul(Fr.sub(f.evaluations[i], y), inverses[@as(usize, @intCast(inv_idx))]);
+
+                inv_idx = @mod(-inv_idx, den);
+                q[@as(u8, @intCast(indexInt))] = Fr.add(
+                    q[@as(u8, @intCast(indexInt))],
+                    Fr.mul(Fr.mul(Fr.mul(Fr.sub(f.evaluations[i], y), inverses[@as(usize, @intCast(inv_idx))]), Aprime_domain[@as(u8, @intCast(indexInt))]), Aprime_domain_inv[i]),
                 );
             }
         }
