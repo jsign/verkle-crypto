@@ -19,30 +19,46 @@ pub fn main() !void {
 
 fn benchFields() void {
     std.debug.print("Setting up fields benchmark...\n", .{});
-    const N = 30_000;
-    const fps: [N]Fp = genBaseFieldElements(N);
+    const N = 200_000;
+    const set_size = 30_000;
+    var fps: [set_size]Fp = genBaseFieldElements(set_size);
     var start: i64 = undefined;
+    var startNano: i128 = undefined;
 
     std.debug.print("\tLegendre symbol... ", .{});
     start = std.time.microTimestamp();
     for (0..N) |i| {
-        _ = Fp.legendre(fps[i]);
-    }
-    std.debug.print("takes {}µs\n", .{@divTrunc((std.time.microTimestamp() - start), (N))});
-
-    std.debug.print("\tField inverse... ", .{});
-    start = std.time.microTimestamp();
-    for (0..N) |i| {
-        _ = Fp.inv(fps[i]).?;
+        _ = Fp.legendre(fps[i % set_size]);
     }
     std.debug.print("takes {}µs\n", .{@divTrunc((std.time.microTimestamp() - start), (N))});
 
     std.debug.print("\tField square root... ", .{});
     start = std.time.microTimestamp();
     for (0..N) |i| {
-        _ = Fp.sqrt(fps[i]).?;
+        _ = Fp.sqrt(fps[i % set_size]).?;
     }
     std.debug.print("takes {}µs\n", .{@divTrunc((std.time.microTimestamp() - start), (N))});
+
+    std.debug.print("\tField inverse... ", .{});
+    start = std.time.microTimestamp();
+    for (0..N) |i| {
+        fps[i % set_size] = Fp.inv(fps[i % set_size]).?;
+    }
+    std.debug.print("takes {}µs\n", .{@divTrunc((std.time.microTimestamp() - start), (N))});
+
+    std.debug.print("\tMul... ", .{});
+    startNano = std.time.nanoTimestamp();
+    for (0..N) |i| {
+        fps[i % set_size] = Fp.mul(fps[i % set_size], fps[(i + 1) % set_size]);
+    }
+    std.debug.print("takes {}ns\n", .{@divTrunc((std.time.nanoTimestamp() - startNano), (N))});
+
+    std.debug.print("\tAdd... ", .{});
+    startNano = std.time.nanoTimestamp();
+    for (0..N) |i| {
+        fps[i % set_size] = Fp.add(fps[i % set_size], fps[(i + 1) % set_size]);
+    }
+    std.debug.print("takes {}ns\n", .{@divTrunc((std.time.nanoTimestamp() - startNano), (N))});
 }
 
 fn benchPedersenHash() !void {
@@ -236,13 +252,15 @@ fn benchMultiproofs() !void {
 
 fn genBaseFieldElements(comptime N: usize) [N]Fp {
     var fps: [N]Fp = undefined;
-    var i: usize = 0;
+    fps[0] = Fp.fromInteger(0x4242 * 0x4242);
+    fps[1] = Fp.fromInteger(0x4140 * 0x4140);
+    var i: usize = 2;
     while (i < N) : (i += 1) {
-        const fe = Fp.fromInteger(i);
-        if (Fp.sqrt(fe) == null) {
-            continue;
+        var fe = fps[i - 1].mul(fps[i - 2]);
+        while (Fp.sqrt(fe) == null) {
+            fe = fe.add(Fp.one());
         }
-        fps[i] = Fp.fromInteger(i);
+        fps[i] = fe;
     }
     return fps;
 }
