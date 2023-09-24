@@ -12,13 +12,10 @@ pub const BandersnatchFields = struct {
 
 fn Field(comptime F: type, comptime mod: u256) type {
     return struct {
+        pub const BitSize = 253; // TODO
         pub const BytesSize = 32;
         pub const MODULO = mod;
         pub const Q_MIN_ONE_DIV_2 = (MODULO - 1) / 2;
-
-        comptime {
-            std.debug.assert(@bitSizeOf(u256) == BytesSize * 8);
-        }
 
         const Self = @This();
         const baseZero = val: {

@@ -4,97 +4,129 @@ const banderwagon = @import("../banderwagon/banderwagon.zig");
 const Element = banderwagon.Element;
 const Fr = banderwagon.Fr;
 
-pub const PrecompMSM = struct {
-    allocator: Allocator,
-    b: usize,
-    basis_len: usize,
-    table: []const Element,
+pub fn PrecompMSM(
+    comptime _t: comptime_int,
+    comptime _b: comptime_int,
+    comptime basis_len: comptime_int,
+) type {
+    return struct {
+        const Self = @This();
 
-    pub fn init(allocator: Allocator, basis: []const Element, b: usize) !PrecompMSM {
-        std.debug.assert(basis.len % b == 0);
+        const b = _b;
+        const t = _t;
+        const window_size = 1 << b;
+        const points_per_column = (Fr.BitSize + t - 1) / t;
+        const num_windows = (points_per_column * basis_len + b - 1) / b;
 
-        const window_size = std.math.shl(usize, 1, b);
-        const num_windows = basis.len / b;
-        const table_num_elements = window_size * num_windows;
-        var table = try allocator.alloc(Element, table_num_elements);
+        allocator: Allocator,
+        table: []const Element,
 
-        for (0..num_windows) |w| {
-            const window_basis = basis[w * b .. (w + 1) * b];
-            fill_window(window_basis, table[w * window_size .. (w + 1) * window_size]);
-        }
-        return PrecompMSM{
-            .allocator = allocator,
-            .b = b,
-            .basis_len = basis.len,
-            .table = table,
-        };
-    }
-
-    pub fn deinit(self: PrecompMSM) void {
-        self.allocator.free(self.table);
-    }
-
-    pub fn msm(self: PrecompMSM, mont_scalars: []const Fr) !Element {
-        std.debug.assert(mont_scalars.len <= self.basis_len);
-
-        var scalars = try self.allocator.alloc(u256, mont_scalars.len);
-        defer self.allocator.free(scalars);
-        for (0..mont_scalars.len) |i| {
-            scalars[i] = mont_scalars[i].toInteger();
-        }
-
-        const window_size = std.math.shl(usize, 1, self.b);
-        const num_windows = self.basis_len / self.b;
-        var accum = Element.identity();
-        for (0..253) |k| {
-            if (k > 0) {
-                accum.double(accum);
-            }
-            for (0..num_windows) |w| {
-                if (w * self.b < scalars.len) {
-                    const window_scalars = scalars[w * self.b ..];
-                    var table_idx: usize = 0;
-                    for (0..self.b) |i| {
-                        table_idx <<= 1;
-                        if (i < window_scalars.len) {
-                            table_idx |= @as(u1, @truncate((window_scalars[i] >> @as(u8, @intCast(252 - k)))));
-                        }
+        pub fn init(allocator: Allocator, basis: [basis_len]Element) !Self {
+            var table_basis = try allocator.alloc(Element, num_windows * basis_len);
+            defer allocator.free(table_basis);
+            var idx: usize = 0;
+            for (0..basis_len) |hi| {
+                table_basis[idx] = basis[hi];
+                idx += 1;
+                for (1..points_per_column) |_| {
+                    table_basis[idx] = table_basis[idx - 1];
+                    for (0..t) |_| {
+                        table_basis[idx].double(table_basis[idx]);
                     }
-                    const window_table = self.table[w * window_size .. (w + 1) * window_size];
-                    accum.add(accum, window_table[table_idx]);
+                    idx += 1;
                 }
             }
+
+            var table = try allocator.alloc(Element, window_size * num_windows);
+            for (0..num_windows) |w| {
+                const start = w * b;
+                var end = (w + 1) * b;
+                if (end > table_basis.len) {
+                    end = table_basis.len;
+                }
+                const window_basis = table_basis[start..end];
+                fill_window(window_basis, table[w * window_size .. (w + 1) * window_size]);
+            }
+            return Self{
+                .allocator = allocator,
+                .table = table,
+            };
         }
 
-        return accum;
-    }
+        pub fn deinit(self: Self) void {
+            self.allocator.free(self.table);
+        }
 
-    fn fill_window(basis: []const Element, table: []Element) void {
-        if (basis.len == 0) {
-            table[0] = Element.identity();
-            return;
+        pub fn msm(self: Self, mont_scalars: []const Fr) !Element {
+            std.debug.assert(mont_scalars.len <= basis_len);
+
+            var scalars = try self.allocator.alloc(u256, mont_scalars.len);
+            defer self.allocator.free(scalars);
+            for (0..mont_scalars.len) |i| {
+                scalars[i] = mont_scalars[i].toInteger();
+            }
+
+            var accum = Element.identity();
+            for (0..t) |t_i| {
+                if (t_i > 0) {
+                    accum.double(accum);
+                }
+
+                var curr_window_idx: usize = 0;
+                var curr_window_scalar: usize = 0;
+                var curr_window_b_idx: u8 = 0;
+                for (0..scalars.len) |s_i| {
+                    var k: u16 = 0;
+                    while (k < Fr.BitSize) : (k += t) {
+                        const bit = scalars[s_i] >> (@as(u8, @intCast(k + t - t_i - 1))) & 1;
+                        curr_window_scalar |= @as(usize, @intCast(bit << (b - curr_window_b_idx - 1)));
+                        curr_window_b_idx += 1;
+
+                        if (curr_window_b_idx == b) {
+                            if (curr_window_scalar > 0) {
+                                accum.add(accum, self.table[curr_window_idx * window_size .. (curr_window_idx + 1) * window_size][curr_window_scalar]);
+                            }
+                            curr_window_idx += 1;
+
+                            curr_window_scalar = 0;
+                            curr_window_b_idx = 0;
+                        }
+                    }
+                }
+            }
+
+            return accum;
         }
-        fill_window(basis[1..], table[0 .. table.len / 2]);
-        for (0..table.len / 2) |i| {
-            table[table.len / 2 + i].add(table[i], basis[0]);
+
+        fn fill_window(basis: []const Element, table: []Element) void {
+            if (basis.len == 0) {
+                for (0..table.len) |i| {
+                    table[i] = Element.identity();
+                }
+                return;
+            }
+            fill_window(basis[1..], table[0 .. table.len / 2]);
+            for (0..table.len / 2) |i| {
+                table[table.len / 2 + i].add(table[i], basis[0]);
+            }
         }
-    }
-};
+    };
+}
 
 test "correctness" {
     const crs = @import("crs.zig");
     const CRS = crs.CRS.init();
     var test_allocator = std.testing.allocator;
 
-    const precomp = try PrecompMSM.init(test_allocator, &CRS.Gs, 8);
+    const precomp = try PrecompMSM(2, 5, crs.DomainSize).init(test_allocator, CRS.Gs);
     defer precomp.deinit();
 
     var scalars: [crs.DomainSize]Fr = undefined;
     for (0..scalars.len) |i| {
-        scalars[i] = Fr.fromInteger(i + 0x424242);
+        scalars[i] = Fr.fromInteger((i + 0x93434) *% 0x424242);
     }
 
-    for (1..crs.DomainSize) |msm_length| {
+    for (1..crs.DomainSize + 1) |msm_length| {
         const msm_scalars = scalars[0..msm_length];
 
         var full_scalars: [crs.DomainSize]Fr = undefined;
