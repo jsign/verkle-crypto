@@ -2011,3 +2011,48 @@ pub fn divstepPrecomp(out1: *[4]u64) void {
     out1[2] = 0x93419abf43c273ee;
     out1[3] = 0x18bdd182ca81ae87;
 }
+
+// add2 is a port of non-assembly gnark-crypto field arithmetic code.
+const q0: u64 = 8429901452645165025;
+const q1: u64 = 18415085837358793841;
+const q2: u64 = 922804724659942912;
+const q3: u64 = 2088379214866112338;
+
+pub fn add2(x: [4]u64, y: [4]u64) [4]u64 {
+    var z: [4]u64 = undefined;
+    var carry: u64 = undefined;
+    z[0] = add64(&carry, x[0], y[0], 0);
+    z[1] = add64(&carry, x[1], y[1], carry);
+    z[2] = add64(&carry, x[2], y[2], carry);
+    z[3] = add64(&carry, x[3], y[3], carry);
+
+    // if z ⩾ q → z -= q
+    if (!smallerThanModulus(z)) {
+        var b: u64 = undefined;
+        z[0] = sub64(&b, z[0], q0, 0);
+        z[1] = sub64(&b, z[1], q1, b);
+        z[2] = sub64(&b, z[2], q2, b);
+        z[3] = sub64(&b, z[3], q3, b);
+    }
+    return z;
+}
+
+// Code below is a port of the Go standard library.
+inline fn add64(outCarry: *u64, x: u64, y: u64, carry: u64) u64 {
+    const sum = x +% y +% carry;
+    // The sum will overflow if both top bits are set (x & y) or if one of them
+    // is (x | y), and a carry from the lower place happened. If such a carry
+    // happens, the top bit will be 1 + 0 + 1 = 0 (&^ sum).
+    outCarry.* = ((x & y) | ((x | y) & ~sum)) >> 63;
+    return sum;
+}
+fn sub64(outCarry: *u64, x: u64, y: u64, borrow: u64) u64 {
+    const diff = x -% y -% borrow;
+    // See Sub32 for the bit logic.
+    outCarry.* = ((~x & y) | ((~(x ^ y)) & diff)) >> 63;
+    return diff;
+}
+
+inline fn smallerThanModulus(z: [4]u64) bool {
+    return (z[3] < q3 or (z[3] == q3 and (z[2] < q2 or (z[2] == q2 and (z[1] < q1 or (z[1] == q1 and (z[0] < q0)))))));
+}

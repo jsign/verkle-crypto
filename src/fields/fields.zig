@@ -86,9 +86,8 @@ fn Field(comptime F: type, comptime mod: u256) type {
             F.fromMontgomery(&nonMont, self.fe);
             return nonMont;
         }
-
         pub fn add(self: Self, other: Self) Self {
-            var ret: F.MontgomeryDomainFieldElement = undefined;
+            var ret: F.NonMontgomeryDomainFieldElement = undefined;
             F.add(&ret, self.fe, other.fe);
             return Self{ .fe = ret };
         }
