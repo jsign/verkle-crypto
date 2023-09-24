@@ -19,7 +19,7 @@ pub fn main() !void {
 
 fn benchFields() void {
     std.debug.print("Setting up fields benchmark...\n", .{});
-    const N = 200_000;
+    const N = 150_000;
     const set_size = 30_000;
     var fps: [set_size]Fp = genBaseFieldElements(set_size);
     var start: i64 = undefined;
@@ -171,7 +171,7 @@ fn benchMultiproofs() !void {
     const LagrangeBasis = polynomials.LagrangeBasis(crs.DomainSize, crs.Domain);
 
     std.debug.print("Setting up multiproofs benchmark...\n", .{});
-    const N = 50;
+    const N = 25;
     const openings = [_]u16{ 1, 10, 100, 1_000 };
 
     const vkt_crs = crs.CRS.init();
