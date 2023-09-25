@@ -64,7 +64,7 @@ fn benchFields() void {
 fn benchPedersenHash() !void {
     std.debug.print("Benchmarking Pedersen hashing...\n", .{});
     const xcrs = crs.CRS.init();
-    const N = 500;
+    const N = 5000;
 
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
     defer {
@@ -73,7 +73,7 @@ fn benchPedersenHash() !void {
     }
     var allocator = gpa.allocator();
 
-    var precomp_msm = try precomp.PrecompMSM(2, 10, crs.DomainSize).init(allocator, xcrs.Gs);
+    var precomp_msm = try precomp.PrecompMSM(4, 6, crs.DomainSize).init(allocator, xcrs.Gs);
     defer precomp_msm.deinit();
 
     var vec_len: usize = 1;
@@ -93,15 +93,9 @@ fn benchPedersenHash() !void {
 
         var start = std.time.microTimestamp();
         for (0..N) |i| {
-            _ = xcrs.commit(vecs[i]);
-        }
-        std.debug.print("naive takes {}µs", .{@divTrunc((std.time.microTimestamp() - start), (N))});
-
-        start = std.time.microTimestamp();
-        for (0..N) |i| {
             _ = try precomp_msm.msm(vecs[i][0..vec_len]);
         }
-        std.debug.print(", optimized takes {}µs\n", .{@divTrunc((std.time.microTimestamp() - start), (N))});
+        std.debug.print("takes {}µs\n", .{@divTrunc((std.time.microTimestamp() - start), (N))});
     }
 }
 

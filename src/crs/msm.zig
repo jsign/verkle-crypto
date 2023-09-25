@@ -3,6 +3,8 @@ const Allocator = std.mem.Allocator;
 const banderwagon = @import("../banderwagon/banderwagon.zig");
 const Element = banderwagon.Element;
 const Fr = banderwagon.Fr;
+const bandersnatch = @import("../bandersnatch/bandersnatch.zig");
+const ElementNormalized = bandersnatch.ExtendedPointNormalized;
 
 pub fn PrecompMSM(
     comptime _t: comptime_int,
@@ -19,7 +21,7 @@ pub fn PrecompMSM(
         const num_windows = (points_per_column * basis_len + b - 1) / b;
 
         allocator: Allocator,
-        table: []const Element,
+        table: []const ElementNormalized,
 
         pub fn init(allocator: Allocator, basis: [basis_len]Element) !Self {
             var table_basis = try allocator.alloc(Element, num_windows * basis_len);
@@ -37,7 +39,8 @@ pub fn PrecompMSM(
                 }
             }
 
-            var table = try allocator.alloc(Element, window_size * num_windows);
+            var nn_table = try allocator.alloc(Element, window_size * num_windows);
+            defer allocator.free(nn_table);
             for (0..num_windows) |w| {
                 const start = w * b;
                 var end = (w + 1) * b;
@@ -45,8 +48,15 @@ pub fn PrecompMSM(
                     end = table_basis.len;
                 }
                 const window_basis = table_basis[start..end];
-                fill_window(window_basis, table[w * window_size .. (w + 1) * window_size]);
+                fill_window(window_basis, nn_table[w * window_size .. (w + 1) * window_size]);
             }
+
+            var table = try allocator.alloc(ElementNormalized, window_size * num_windows);
+            // TODO: batch.
+            for (nn_table, 0..) |p, i| {
+                table[i] = ElementNormalized.fromExtendedPoint(p.point);
+            }
+
             return Self{
                 .allocator = allocator,
                 .table = table,
@@ -66,10 +76,10 @@ pub fn PrecompMSM(
                 scalars[i] = mont_scalars[i].toInteger();
             }
 
-            var accum = Element.identity();
+            var accum = bandersnatch.ExtendedPoint.identity();
             for (0..t) |t_i| {
                 if (t_i > 0) {
-                    accum.double(accum);
+                    accum = bandersnatch.ExtendedPoint.double(accum);
                 }
 
                 var curr_window_idx: usize = 0;
@@ -84,7 +94,7 @@ pub fn PrecompMSM(
 
                         if (curr_window_b_idx == b) {
                             if (curr_window_scalar > 0) {
-                                accum.add(accum, self.table[curr_window_idx * window_size .. (curr_window_idx + 1) * window_size][curr_window_scalar]);
+                                accum = bandersnatch.ExtendedPoint.mixedAdd(accum, self.table[curr_window_idx * window_size .. (curr_window_idx + 1) * window_size][curr_window_scalar]);
                             }
                             curr_window_idx += 1;
 
@@ -95,7 +105,7 @@ pub fn PrecompMSM(
                 }
             }
 
-            return accum;
+            return Element{ .point = accum };
         }
 
         fn fill_window(basis: []const Element, table: []Element) void {
