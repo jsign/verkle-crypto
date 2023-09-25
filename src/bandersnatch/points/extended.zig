@@ -78,7 +78,7 @@ pub fn add(p: ExtendedPoint, q: ExtendedPoint) ExtendedPoint {
     const e = Fp.sub(Fp.sub(Fp.mul(Fp.add(p.x, p.y), Fp.add(q.x, q.y)), a), b);
     const f = Fp.sub(d, c);
     const g = Fp.add(d, c);
-    const h = Fp.sub(b, a.neg().mulBy5());
+    const h = Fp.sub(b, mulByA(a));
 
     return ExtendedPoint{
         .x = Fp.mul(e, f),
@@ -89,7 +89,7 @@ pub fn add(p: ExtendedPoint, q: ExtendedPoint) ExtendedPoint {
 }
 
 inline fn mulByA(x: Fp) Fp {
-    x.neg().mulBy5();
+    return x.neg().mulBy5();
 }
 
 pub fn sub(p: ExtendedPoint, q: ExtendedPoint) ExtendedPoint {
@@ -98,8 +98,26 @@ pub fn sub(p: ExtendedPoint, q: ExtendedPoint) ExtendedPoint {
 }
 
 pub fn double(self: ExtendedPoint) ExtendedPoint {
-    // TODO: can replace this with dedicated doubling formula
-    return add(self, self);
+    // https://hyperelliptic.org/EFD/g1p/auto-twisted-extended.html#doubling-dbl-2008-hwcd
+    const A = self.x.square();
+    const B = self.y.square();
+    const t0 = self.z.square();
+    const C = Fp.add(t0, t0);
+    const D = mulByA(A);
+    const t1 = Fp.add(self.x, self.y);
+    const t2 = t1.square();
+    const t3 = Fp.sub(t2, A);
+    const E = Fp.sub(t3, B);
+    const G = Fp.add(D, B);
+    const F = Fp.sub(G, C);
+    const H = Fp.sub(D, B);
+
+    return ExtendedPoint{
+        .x = Fp.mul(E, F),
+        .y = Fp.mul(G, H),
+        .t = Fp.mul(E, H),
+        .z = Fp.mul(F, G),
+    };
 }
 
 pub fn scalarMul(point: ExtendedPoint, scalarMont: Fr) ExtendedPoint {
