@@ -162,3 +162,34 @@ test "sqrt" {
 
     try std.testing.expect(b.equal(b_sqrt_sqr));
 }
+
+test "batch inv" {
+    var fes: [25]Fp = undefined;
+    for (0..fes.len) |i| {
+        fes[i] = Fp.fromInteger(0x434343 + i * 0x424242);
+    }
+
+    var exp_invs: [fes.len]Fp = undefined;
+    for (fes, 0..) |f, i| {
+        exp_invs[i] = f.inv().?;
+    }
+
+    var got_invs: [fes.len]Fp = undefined;
+    try Fp.batchInv(&got_invs, &fes);
+
+    for (exp_invs, got_invs) |exp, got| {
+        try std.testing.expect(exp.equal(got));
+    }
+}
+
+test "batch inv with error" {
+    var fes: [3]Fp = undefined;
+    for (0..fes.len) |i| {
+        fes[i] = Fp.fromInteger(0x434343 + i * 0x424242);
+    }
+    fes[1] = Fp.zero();
+
+    var got_invs: [fes.len]Fp = undefined;
+    const out = Fp.batchInv(&got_invs, &fes);
+    try std.testing.expectError(error.CantInvertZeroElement, out);
+}

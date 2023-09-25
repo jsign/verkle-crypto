@@ -11,13 +11,13 @@ const Transcript = @import("ipa/transcript.zig");
 const precomp = @import("crs/msm.zig");
 
 pub fn main() !void {
-    benchFields();
+    try benchFields();
     try benchPedersenHash();
     try benchIPAs();
     try benchMultiproofs();
 }
 
-fn benchFields() void {
+fn benchFields() !void {
     std.debug.print("Setting up fields benchmark...\n", .{});
     const N = 150_000;
     const set_size = 30_000;
@@ -43,6 +43,15 @@ fn benchFields() void {
     start = std.time.microTimestamp();
     for (0..N) |i| {
         fps[i % set_size] = Fp.inv(fps[i % set_size]).?;
+    }
+    std.debug.print("takes {}µs\n", .{@divTrunc((std.time.microTimestamp() - start), (N))});
+
+    std.debug.print("\tField batch inverse (100 elements)... ", .{});
+    start = std.time.microTimestamp();
+    var inv_fps: [100]Fp = undefined;
+    for (0..N) |i| {
+        const start_idx = i % (set_size - 100);
+        try Fp.batchInv(&inv_fps, fps[start_idx .. start_idx + 100]);
     }
     std.debug.print("takes {}µs\n", .{@divTrunc((std.time.microTimestamp() - start), (N))});
 

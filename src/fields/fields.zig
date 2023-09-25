@@ -149,6 +149,21 @@ fn Field(comptime F: type, comptime mod: u256) type {
             return res;
         }
 
+        pub fn batchInv(out: []Self, in: []const Self) !void {
+            std.debug.assert(out.len == in.len);
+
+            var acc = one();
+            for (0..in.len) |i| {
+                out[i] = acc;
+                acc = mul(acc, in[i]);
+            }
+            acc = acc.inv() orelse return error.CantInvertZeroElement;
+            for (0..in.len) |i| {
+                out[in.len - i - 1] = mul(out[in.len - i - 1], acc);
+                acc = mul(acc, in[in.len - i - 1]);
+            }
+        }
+
         pub fn inv(self: Self) ?Self {
             var r: u256 = MODULO;
             var t: i512 = 0;
