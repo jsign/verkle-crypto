@@ -114,7 +114,7 @@ fn benchIPAs() !void {
     std.debug.print("Setting up IPA benchmark...\n", .{});
     const N = 100;
 
-    var weights = PrecomputedWeights.init();
+    var weights = try PrecomputedWeights.init();
     const xcrs = crs.CRS.init();
     const IPA = ipa.IPA(crs.DomainSize);
 
@@ -134,7 +134,7 @@ fn benchIPAs() !void {
         }
         prover_queries[i].commitment = xcrs.commit(prover_queries[i].A);
         prover_queries[i].eval_point = Fr.fromInteger(i + 0x414039).add(z256);
-        prover_queries[i].B = weights.barycentricFormulaConstants(prover_queries[i].eval_point);
+        prover_queries[i].B = try weights.barycentricFormulaConstants(prover_queries[i].eval_point);
     }
 
     var accum_prover: i64 = 0;
@@ -203,7 +203,7 @@ fn benchMultiproofs() !void {
         vec_openings[i].C = crs.CRS.commit(vkt_crs, vec_openings[i].poly_evaluations);
     }
 
-    const mproof = multiproof.MultiProof.init(vkt_crs);
+    const mproof = try multiproof.MultiProof.init(vkt_crs);
     for (openings) |num_openings| {
         std.debug.print("\tBenchmarking {} openings...", .{num_openings});
 

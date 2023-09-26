@@ -38,9 +38,9 @@ pub const MultiProof = struct {
     precomp: PrecomputedWeights,
     crs: CRS,
 
-    pub fn init(vkt_crs: CRS) MultiProof {
+    pub fn init(vkt_crs: CRS) !MultiProof {
         return MultiProof{
-            .precomp = PrecomputedWeights.init(),
+            .precomp = try PrecomputedWeights.init(),
             .crs = vkt_crs,
         };
     }
@@ -114,7 +114,7 @@ pub const MultiProof = struct {
 
         const polynomial = h_minus_g;
         const eval_point = t;
-        const input_point_vector = self.precomp.barycentricFormulaConstants(eval_point);
+        const input_point_vector = try self.precomp.barycentricFormulaConstants(eval_point);
 
         var query = IPA.ProverQuery{
             .commitment = ipa_commitment,
@@ -182,7 +182,7 @@ pub const MultiProof = struct {
         ipa_commitment.sub(E, D);
         const eval_point = t;
         const output_point = y;
-        const input_point_vector = self.precomp.barycentricFormulaConstants(eval_point);
+        const input_point_vector = try self.precomp.barycentricFormulaConstants(eval_point);
 
         const query = IPA.VerifierQuery{
             .commitment = ipa_commitment,
@@ -318,7 +318,7 @@ test "basic" {
         .y = ys[1],
     };
 
-    const multiproof = MultiProof.init(vkt_crs);
+    const multiproof = try MultiProof.init(vkt_crs);
 
     var prover_transcript = Transcript.init("test");
     const proof = try multiproof.createProof(&prover_transcript, &[_]ProverQuery{ query_a, query_b });

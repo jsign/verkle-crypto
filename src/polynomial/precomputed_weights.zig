@@ -26,16 +26,16 @@ pub fn PrecomputedWeights(
         //Inverse of the domain
         domain_inverses: [2 * crs.DomainSize]Fr,
 
-        pub fn init() Self {
+        pub fn init() !Self {
             const _A = monomial_basis.MonomialBasis(DomainSize).vanishingPoly(domain);
             const _Aprime = _A.formalDerivative();
             var _Aprime_domain: [DomainSize]Fr = undefined;
-            var _Aprime_domain_inv: [DomainSize]Fr = undefined;
 
             for (0..DomainSize) |i| {
                 _Aprime_domain[i] = _Aprime.evaluate(Fr.fromInteger(i));
-                _Aprime_domain_inv[i] = Fr.inv(_Aprime_domain[i]).?; // TODO(jsign): could do batching.
             }
+            var _Aprime_domain_inv: [DomainSize]Fr = undefined;
+            try Fr.batchInv(&_Aprime_domain_inv, &_Aprime_domain);
 
             // This is not fully correct as the first element will be the inverse of 0
             // We keep it this way for now because it is what the research code did
@@ -59,16 +59,17 @@ pub fn PrecomputedWeights(
         // barycentricFormularConstants returns a slice with the constants to be used when evaluating a polynomial at z.
         // b_i = A(z) / A'(DOMAIN[i]) * 1 / (z - DOMAIN[i])
         // The caller is responsible for freeing the returned slice.
-        pub fn barycentricFormulaConstants(self: Self, z: Fr) [DomainSize]Fr {
+        pub fn barycentricFormulaConstants(self: Self, z: Fr) ![DomainSize]Fr {
             std.debug.assert(z.toInteger() >= DomainSize);
 
             const Az = self.A.evaluate(z);
 
-            var zSubXInvs: [DomainSize]Fr = undefined;
+            var zSubX: [DomainSize]Fr = undefined;
             for (crs.Domain, 0..) |x, i| {
-                // TODO(jsign): batching.
-                zSubXInvs[i] = Fr.inv(Fr.sub(z, x)).?;
+                zSubX[i] = Fr.sub(z, x);
             }
+            var zSubXInvs: [DomainSize]Fr = undefined;
+            try Fr.batchInv(&zSubXInvs, &zSubX);
 
             var r: [DomainSize]Fr = undefined;
             for (0..DomainSize) |i| {

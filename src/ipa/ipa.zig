@@ -235,7 +235,7 @@ test "basic proof" {
     const ipa = IPA(crs.DomainSize);
 
     // Test a simple IPA proof
-    var weights = PrecomputedWeights.init();
+    var weights = try PrecomputedWeights.init();
 
     // Polynomial in lagrange basis
     var lagrange_poly: [crs.DomainSize]Fr = undefined;
@@ -254,7 +254,7 @@ test "basic proof" {
 
     // create a opening proof for a point outside of the domain
     const eval_point = Fr.fromInteger(2101);
-    const b = weights.barycentricFormulaConstants(eval_point);
+    const b = try weights.barycentricFormulaConstants(eval_point);
     const output_point_check = ipa.innerProduct(&lagrange_poly, &b);
     const output_point_check_hex = std.fmt.bytesToHex(output_point_check.toBytes(), std.fmt.Case.lower);
     try std.testing.expectEqualStrings("4a353e70b03c89f161de002e8713beec0d740a5e20722fd5bd68b30540a33208", &output_point_check_hex);
@@ -275,7 +275,7 @@ test "basic proof" {
 
     // Verify the proof.
     var verifier_transcript = Transcript.init("test");
-    const b_verifier = weights.barycentricFormulaConstants(eval_point);
+    const b_verifier = try weights.barycentricFormulaConstants(eval_point);
     const verifier_query = ipa.VerifierQuery{
         .commitment = commitment,
         .B = b_verifier,
