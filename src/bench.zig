@@ -107,7 +107,6 @@ fn benchPedersenHash() !void {
 }
 
 fn benchIPAs() !void {
-    const PrecomputedWeights = @import("polynomial/precomputed_weights.zig").PrecomputedWeights(crs.DomainSize, crs.Domain);
     const N = 100;
 
     std.debug.print("Setting up IPA benchmark...\n", .{});
@@ -118,12 +117,12 @@ fn benchIPAs() !void {
     }
     var allocator = gpa.allocator();
 
-    var weights = try PrecomputedWeights.init();
     const xcrs = try crs.CRS.init(allocator);
     defer xcrs.deinit();
-    const IPA = ipa.IPA(crs.DomainSize);
+    const VKTIPA = ipa.IPA(crs.DomainSize);
+    const vktipa = try VKTIPA.init();
 
-    var prover_queries: []IPA.ProverQuery = try allocator.alloc(IPA.ProverQuery, 16);
+    var prover_queries: []VKTIPA.ProverQuery = try allocator.alloc(VKTIPA.ProverQuery, 16);
     defer allocator.free(prover_queries);
     const z256 = Fr.fromInteger(256);
     for (0..prover_queries.len) |i| {
@@ -132,7 +131,6 @@ fn benchIPAs() !void {
         }
         prover_queries[i].commitment = try xcrs.commit(&prover_queries[i].A);
         prover_queries[i].eval_point = Fr.fromInteger(i + 0x414039).add(z256);
-        prover_queries[i].B = try weights.barycentricFormulaConstants(prover_queries[i].eval_point);
     }
 
     var accum_prover: i64 = 0;
@@ -142,20 +140,19 @@ fn benchIPAs() !void {
         // Prover.
         var prover_transcript = Transcript.init("test");
         var start = std.time.milliTimestamp();
-        const proof = IPA.createProof(xcrs, &prover_transcript, prover_queries[i]);
+        const proof = try vktipa.createProof(xcrs, &prover_transcript, prover_queries[i]);
         accum_prover += std.time.milliTimestamp() - start;
 
         // Verifier.
         start = std.time.milliTimestamp();
         var verifier_transcript = Transcript.init("test");
-        const verifier_query = IPA.VerifierQuery{
+        const verifier_query = VKTIPA.VerifierQuery{
             .commitment = prover_queries[i].commitment,
-            .B = prover_queries[i].B,
             .eval_point = prover_queries[i].eval_point,
             .result = proof.result,
             .proof = proof.proof,
         };
-        const ok = IPA.verifyProof(xcrs, &verifier_transcript, verifier_query);
+        const ok = try vktipa.verifyProof(xcrs, &verifier_transcript, verifier_query);
         std.debug.assert(ok);
         accum_verifier += std.time.milliTimestamp() - start;
     }

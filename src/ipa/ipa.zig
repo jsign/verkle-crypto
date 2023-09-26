@@ -5,6 +5,7 @@ const Fr = banderwagon.Fr;
 const crs = @import("../crs/crs.zig");
 const Transcript = @import("transcript.zig");
 const assert = std.debug.assert;
+const PrecomputedWeights = @import("../polynomial/precomputed_weights.zig").PrecomputedWeights(crs.DomainSize, crs.Domain);
 
 pub fn IPA(comptime VectorLength: comptime_int) type {
     assert(std.math.isPowerOfTwo(VectorLength));
@@ -17,13 +18,11 @@ pub fn IPA(comptime VectorLength: comptime_int) type {
         pub const ProverQuery = struct {
             commitment: Element,
             A: [VectorLength]Fr,
-            B: [VectorLength]Fr,
             eval_point: Fr,
         };
 
         pub const VerifierQuery = struct {
             commitment: Element,
-            B: [VectorLength]Fr,
             eval_point: Fr,
             result: Fr,
             proof: IPAProof,
@@ -40,14 +39,22 @@ pub fn IPA(comptime VectorLength: comptime_int) type {
             proof: IPAProof,
         };
 
-        pub fn createProof(xcrs: crs.CRS, transcript: *Transcript, query: ProverQuery) ProofResult {
+        precomputed_weights: PrecomputedWeights,
+
+        pub fn init() !Self {
+            return .{
+                .precomputed_weights = try PrecomputedWeights.init(),
+            };
+        }
+
+        pub fn createProof(self: Self, xcrs: crs.CRS, transcript: *Transcript, query: ProverQuery) !ProofResult {
             transcript.domainSep("ipa");
             transcript.appendPoint(query.commitment, "C");
             transcript.appendScalar(query.eval_point, "input point");
 
             var _A = query.A;
             var A: []Fr = _A[0..];
-            var _B = query.B;
+            var _B = try self.precomputed_weights.barycentricFormulaConstants(query.eval_point);
             var B: []Fr = _B[0..];
             const y = innerProduct(A, B);
             transcript.appendScalar(y, "output point");
@@ -110,8 +117,10 @@ pub fn IPA(comptime VectorLength: comptime_int) type {
             return .{ .result = y, .proof = IPAProof{ .a = A[0], .L = L, .R = R } };
         }
 
-        pub fn verifyProof(xcrs: crs.CRS, transcript: *Transcript, query: VerifierQuery) bool {
+        pub fn verifyProof(self: Self, xcrs: crs.CRS, transcript: *Transcript, query: VerifierQuery) !bool {
             transcript.domainSep("ipa");
+
+            var B = try self.precomputed_weights.barycentricFormulaConstants(query.eval_point);
 
             const C = query.commitment;
             transcript.appendPoint(C, "C");
@@ -160,8 +169,7 @@ pub fn IPA(comptime VectorLength: comptime_int) type {
             var _Gs = xcrs.Gs;
             var current_basis: []Element = _Gs[0..];
 
-            var _b = query.B;
-            var b: []Fr = _b[0..];
+            var b: []Fr = B[0..];
             for (0..xs.len) |j| {
                 const current_basis_split = splitInHalf(Element, current_basis);
                 const b_split = splitInHalf(Fr, b);
@@ -208,16 +216,16 @@ pub fn IPA(comptime VectorLength: comptime_int) type {
             const mid = x.len / 2;
             return .{ .L = x[0..mid], .R = x[mid..] };
         }
-
-        fn innerProduct(a: []const Fr, b: []const Fr) Fr {
-            var result = Fr.zero();
-            for (a, b) |ai, bi| {
-                const term = ai.mul(bi);
-                result = Fr.add(result, term);
-            }
-            return result;
-        }
     };
+}
+
+fn innerProduct(a: []const Fr, b: []const Fr) Fr {
+    var result = Fr.zero();
+    for (a, b) |ai, bi| {
+        const term = ai.mul(bi);
+        result = Fr.add(result, term);
+    }
+    return result;
 }
 
 test "inner product smoke" {
@@ -226,13 +234,13 @@ test "inner product smoke" {
 
     // Expected result should be 1*10 + 2*12 + 3*13 + 4*14 + 5*15
     const expected_result = Fr.fromInteger(204);
-    const got_result = IPA(crs.DomainSize).innerProduct(&a, &b);
+    const got_result = innerProduct(&a, &b);
     try std.testing.expect(got_result.equal(expected_result));
 }
 
 test "basic proof" {
-    const PrecomputedWeights = @import("../polynomial/precomputed_weights.zig").PrecomputedWeights(crs.DomainSize, crs.Domain);
-    const ipa = IPA(crs.DomainSize);
+    const VKTIPA = IPA(crs.DomainSize);
+    const ipa = try VKTIPA.init();
 
     // Test a simple IPA proof
     var weights = try PrecomputedWeights.init();
@@ -256,18 +264,17 @@ test "basic proof" {
     // create a opening proof for a point outside of the domain
     const eval_point = Fr.fromInteger(2101);
     const b = try weights.barycentricFormulaConstants(eval_point);
-    const output_point_check = ipa.innerProduct(&lagrange_poly, &b);
+    const output_point_check = innerProduct(&lagrange_poly, &b);
     const output_point_check_hex = std.fmt.bytesToHex(output_point_check.toBytes(), std.fmt.Case.lower);
     try std.testing.expectEqualStrings("4a353e70b03c89f161de002e8713beec0d740a5e20722fd5bd68b30540a33208", &output_point_check_hex);
 
-    var query = ipa.ProverQuery{
+    var query = VKTIPA.ProverQuery{
         .commitment = commitment,
         .A = lagrange_poly,
-        .B = b,
         .eval_point = eval_point,
     };
 
-    var ipa_proof = ipa.createProof(xcrs, &prover_transcript, query);
+    var ipa_proof = try ipa.createProof(xcrs, &prover_transcript, query);
 
     // Lets check the state of the transcript by squeezing out another challenge
     const p_challenge = prover_transcript.challengeScalar("state");
@@ -276,14 +283,12 @@ test "basic proof" {
 
     // Verify the proof.
     var verifier_transcript = Transcript.init("test");
-    const b_verifier = try weights.barycentricFormulaConstants(eval_point);
-    const verifier_query = ipa.VerifierQuery{
+    const verifier_query = VKTIPA.VerifierQuery{
         .commitment = commitment,
-        .B = b_verifier,
         .eval_point = eval_point,
         .result = ipa_proof.result,
         .proof = ipa_proof.proof,
     };
-    const ok = ipa.verifyProof(xcrs, &verifier_transcript, verifier_query);
+    const ok = try ipa.verifyProof(xcrs, &verifier_transcript, verifier_query);
     try std.testing.expect(ok);
 }

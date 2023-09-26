@@ -35,12 +35,14 @@ pub const Proof = struct {
 };
 
 pub const MultiProof = struct {
-    precomp: PrecomputedWeights,
+    weights: PrecomputedWeights,
+    ipa: IPA,
     crs: CRS,
 
     pub fn init(vkt_crs: CRS) !MultiProof {
         return MultiProof{
-            .precomp = try PrecomputedWeights.init(),
+            .weights = try PrecomputedWeights.init(),
+            .ipa = try IPA.init(),
             .crs = vkt_crs,
         };
     }
@@ -114,15 +116,13 @@ pub const MultiProof = struct {
 
         const polynomial = h_minus_g;
         const eval_point = t;
-        const input_point_vector = try self.precomp.barycentricFormulaConstants(eval_point);
 
         var query = IPA.ProverQuery{
             .commitment = ipa_commitment,
             .A = polynomial,
-            .B = input_point_vector,
             .eval_point = eval_point,
         };
-        const proof_res = IPA.createProof(self.crs, transcript, query);
+        const proof_res = try self.ipa.createProof(self.crs, transcript, query);
 
         return Proof{ .ipa = proof_res.proof, .D = D };
     }
@@ -214,12 +214,11 @@ pub const MultiProof = struct {
 
         const query = IPA.VerifierQuery{
             .commitment = E_minus_D,
-            .B = try self.precomp.barycentricFormulaConstants(t),
             .eval_point = t,
             .result = g_2_of_t,
             .proof = ipa_proof,
         };
-        return IPA.verifyProof(self.crs, transcript, query);
+        return self.ipa.verifyProof(self.crs, transcript, query);
     }
 
     fn powersOf(allocator: Allocator, x: Fr, degree_minus_one: usize) ![]const Fr {
@@ -232,9 +231,9 @@ pub const MultiProof = struct {
     }
 
     fn computeQuotientInsideDomain(self: MultiProof, f: LagrangeBasis, index: u8) LagrangeBasis {
-        const inverses = self.precomp.domain_inverses;
-        const Aprime_domain = self.precomp.Aprime_DOMAIN;
-        const Aprime_domain_inv = self.precomp.Aprime_DOMAIN_inv;
+        const inverses = self.weights.domain_inverses;
+        const Aprime_domain = self.weights.Aprime_DOMAIN;
+        const Aprime_domain_inv = self.weights.Aprime_DOMAIN_inv;
 
         const indexIsize = @as(isize, index);
 
