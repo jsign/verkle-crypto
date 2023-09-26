@@ -244,8 +244,9 @@ test "basic proof" {
     }
 
     // Commit to the polynomial in lagrange basis
-    const xcrs = crs.CRS.init();
-    const commitment = xcrs.commit(lagrange_poly);
+    const xcrs = try crs.CRS.init(std.testing.allocator);
+    defer xcrs.deinit();
+    const commitment = try xcrs.commit(&lagrange_poly);
 
     const expected_comm = std.fmt.bytesToHex(commitment.toBytes(), std.fmt.Case.lower);
     try std.testing.expectEqualStrings("1b9dff8f5ebbac250d291dfe90e36283a227c64b113c37f1bfb9e7a743cdb128", &expected_comm);

@@ -15,6 +15,10 @@ test "crs" {
     _ = @import("crs/crs.zig");
 }
 
+test "msm" {
+    _ = @import("msm/msm.zig");
+}
+
 test "fields" {
     _ = @import("fields/fields.zig");
 }

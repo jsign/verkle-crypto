@@ -10,7 +10,6 @@ const ExtendedPointNormalized = bandersnatch.ExtendedPointNormalized;
 pub fn PrecompMSM(
     comptime _t: comptime_int,
     comptime _b: comptime_int,
-    comptime basis_len: comptime_int,
 ) type {
     return struct {
         const Self = @This();
@@ -19,16 +18,19 @@ pub fn PrecompMSM(
         const t = _t;
         const window_size = 1 << b;
         const points_per_column = (Fr.BitSize + t - 1) / t;
-        const num_windows = (points_per_column * basis_len + b - 1) / b;
 
         allocator: Allocator,
         table: []const ExtendedPointNormalized,
 
-        pub fn init(allocator: Allocator, basis: [basis_len]Element) !Self {
-            var table_basis = try allocator.alloc(ExtendedPoint, num_windows * basis_len);
+        num_windows: usize,
+        basis_len: usize,
+
+        pub fn init(allocator: Allocator, basis: []const Element) !Self {
+            const num_windows = (points_per_column * basis.len + b - 1) / b;
+            var table_basis = try allocator.alloc(ExtendedPoint, points_per_column * basis.len);
             defer allocator.free(table_basis);
             var idx: usize = 0;
-            for (0..basis_len) |hi| {
+            for (0..basis.len) |hi| {
                 table_basis[idx] = basis[hi].point;
                 idx += 1;
                 for (1..points_per_column) |_| {
@@ -58,6 +60,8 @@ pub fn PrecompMSM(
             return Self{
                 .allocator = allocator,
                 .table = table,
+                .num_windows = num_windows,
+                .basis_len = basis.len,
             };
         }
 
@@ -66,7 +70,9 @@ pub fn PrecompMSM(
         }
 
         pub fn msm(self: Self, mont_scalars: []const Fr) !Element {
-            std.debug.assert(mont_scalars.len <= basis_len);
+            if (mont_scalars.len > self.basis_len) {
+                return error.ScalarLengthBiggerThanBasis;
+            }
 
             var scalars = try self.allocator.alloc(u256, mont_scalars.len);
             defer self.allocator.free(scalars);
@@ -122,11 +128,11 @@ pub fn PrecompMSM(
 }
 
 test "correctness" {
-    const crs = @import("crs.zig");
-    const CRS = crs.CRS.init();
-    var test_allocator = std.testing.allocator;
+    const crs = @import("../crs/crs.zig");
+    const xcrs = try crs.CRS.init(std.testing.allocator);
+    defer xcrs.deinit();
 
-    const precomp = try PrecompMSM(2, 5, crs.DomainSize).init(test_allocator, CRS.Gs);
+    const precomp = try PrecompMSM(2, 5).init(std.testing.allocator, &xcrs.Gs);
     defer precomp.deinit();
 
     var scalars: [crs.DomainSize]Fr = undefined;
@@ -145,7 +151,7 @@ test "correctness" {
             }
             full_scalars[i] = Fr.zero();
         }
-        const exp = CRS.commit(full_scalars);
+        const exp = xcrs.commitSlow(full_scalars);
         const got = try precomp.msm(msm_scalars);
 
         try std.testing.expect(Element.equal(exp, got));

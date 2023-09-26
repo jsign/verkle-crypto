@@ -1,6 +1,8 @@
 const std = @import("std");
+const Allocator = std.mem.Allocator;
 const sha256 = std.crypto.hash.sha2.Sha256;
 const banderwagon = @import("../banderwagon/banderwagon.zig");
+const msm = @import("../msm/msm.zig");
 const Element = banderwagon.Element;
 const Fr = banderwagon.Fr;
 
@@ -20,18 +22,31 @@ pub const Domain: [DomainSize]Fr = domain_elements: {
 
 // CRS contains the base pof points for Pedersen Commitments.
 pub const CRS = struct {
+    const PrecompMSM = msm.PrecompMSM(2, 8);
+
     Gs: [DomainSize]Element,
     Q: Element,
+    precomp: PrecompMSM,
 
-    pub fn init() CRS {
+    pub fn init(allocator: Allocator) !CRS {
+        const points = deserialize_vkt_points();
         return CRS{
-            .Gs = deserialize_vkt_points(),
+            .Gs = points,
             .Q = Element.generator(),
+            .precomp = try PrecompMSM.init(allocator, &points),
         };
     }
 
-    pub fn commit(crs: CRS, values: [DomainSize]Fr) Element {
-        return banderwagon.msm(&crs.Gs, &values);
+    pub fn deinit(self: CRS) void {
+        self.precomp.deinit();
+    }
+
+    pub fn commit(self: CRS, values: []const Fr) !Element {
+        return try self.precomp.msm(values);
+    }
+
+    pub fn commitSlow(self: CRS, values: [DomainSize]Fr) Element {
+        return banderwagon.msm(&self.Gs, &values);
     }
 };
 
@@ -46,7 +61,8 @@ fn deserialize_vkt_points() [DomainSize]Element {
 }
 
 test "crs is consistent" {
-    const crs = CRS.init();
+    const crs = try CRS.init(std.testing.allocator);
+    defer crs.deinit();
     try std.testing.expect(crs.Gs.len == vkt_crs_points.len);
 
     // Reserialize Gs points and check they match with the original representation.
@@ -67,7 +83,8 @@ test "crs is consistent" {
 }
 
 test "Gs cannot contain the generator" {
-    const crs = CRS.init();
+    const crs = try CRS.init(std.testing.allocator);
+    defer crs.deinit();
     const generator = Element.generator();
     for (crs.Gs) |point| {
         try std.testing.expect(!generator.equal(point));
@@ -332,7 +349,3 @@ const vkt_crs_points = [_][]const u8{
     "3102a5884d3dce8d94a8cf6d5ab2d3a4c76ec8b00f4554caa68c028aedf5970f",
     "3de2be346b539395b0c0de56a5ccca54a317f1b5c80107b0802af9a62276a4d8",
 };
-
-test "msm" {
-    _ = @import("msm.zig");
-}

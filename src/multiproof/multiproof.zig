@@ -8,6 +8,7 @@ const Transcript = @import("../ipa/transcript.zig");
 const ipa = @import("../ipa/ipa.zig");
 const crs = @import("../crs/crs.zig");
 const CRS = crs.CRS;
+const msm = @import("../msm/msm.zig");
 const precomputed_weights = @import("../polynomial/precomputed_weights.zig");
 
 const IPA = ipa.IPA(crs.DomainSize);
@@ -74,7 +75,7 @@ pub const MultiProof = struct {
             power_of_r = Fr.mul(power_of_r, r);
         }
 
-        const D = CRS.commit(self.crs, g);
+        const D = try CRS.commit(self.crs, &g);
         transcript.appendPoint(D, "D");
 
         // Step 2: Compute h in evaluation form
@@ -105,7 +106,7 @@ pub const MultiProof = struct {
 
         // Step 3: Evaluate and compute IPA proofs
 
-        const E = CRS.commit(self.crs, h);
+        const E = try CRS.commit(self.crs, &h);
         transcript.appendPoint(E, "E");
 
         var ipa_commitment: Element = undefined;
@@ -203,7 +204,8 @@ pub const MultiProof = struct {
             Cs[i] = query.C;
             E_coefficients[i] = Fr.mul(powers_of_r[i], helper_scalar_den[queries[i].z]);
         }
-        const E = banderwagon.msm(Cs, E_coefficients);
+        var precomp = try msm.PrecompMSM(8, 8).init(allocator, Cs);
+        const E = try precomp.msm(E_coefficients);
         transcript.appendPoint(E, "E");
 
         // Check IPA proof.
@@ -330,9 +332,10 @@ test "basic" {
         Fr.fromInteger(1),
     } ** 8;
 
-    const vkt_crs = CRS.init();
-    const C_a = CRS.commit(vkt_crs, poly_eval_a);
-    const C_b = CRS.commit(vkt_crs, poly_eval_b);
+    const xcrs = try CRS.init(std.testing.allocator);
+    defer xcrs.deinit();
+    const C_a = try CRS.commit(xcrs, &poly_eval_a);
+    const C_b = try CRS.commit(xcrs, &poly_eval_b);
     const zs = [_]u8{ 0, 0 };
     const ys = [_]Fr{ Fr.fromInteger(1), Fr.fromInteger(32) };
     const fs = [_][256]Fr{ poly_eval_a, poly_eval_b };
@@ -351,7 +354,7 @@ test "basic" {
         .y = ys[1],
     };
 
-    const multiproof = try MultiProof.init(vkt_crs);
+    const multiproof = try MultiProof.init(xcrs);
 
     var prover_transcript = Transcript.init("test");
     const proof = try multiproof.createProof(&prover_transcript, &[_]ProverQuery{ query_a, query_b });
