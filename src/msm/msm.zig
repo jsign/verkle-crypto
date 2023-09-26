@@ -92,8 +92,10 @@ pub fn PrecompMSM(
                 for (0..scalars.len) |s_i| {
                     var k: u16 = 0;
                     while (k < Fr.BitSize) : (k += t) {
-                        const bit = scalars[s_i] >> (@as(u8, @intCast(k + t - t_i - 1))) & 1;
-                        curr_window_scalar |= @as(usize, @intCast(bit << (b - curr_window_b_idx - 1)));
+                        if (k + t - t_i - 1 < Fr.BitSize) {
+                            const bit = scalars[s_i] >> (@as(u8, @intCast(k + t - t_i - 1))) & 1;
+                            curr_window_scalar |= @as(usize, @intCast(bit << (b - curr_window_b_idx - 1)));
+                        }
                         curr_window_b_idx += 1;
 
                         if (curr_window_b_idx == b) {
@@ -106,6 +108,9 @@ pub fn PrecompMSM(
                             curr_window_b_idx = 0;
                         }
                     }
+                }
+                if (curr_window_scalar > 0) {
+                    accum = bandersnatch.ExtendedPoint.mixedAdd(accum, self.table[curr_window_idx * window_size .. (curr_window_idx + 1) * window_size][curr_window_scalar]);
                 }
             }
 
