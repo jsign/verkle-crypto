@@ -4,7 +4,8 @@ const banderwagon = @import("../banderwagon/banderwagon.zig");
 const Element = banderwagon.Element;
 const Fr = banderwagon.Fr;
 const bandersnatch = @import("../bandersnatch/bandersnatch.zig");
-const ElementNormalized = bandersnatch.ExtendedPointNormalized;
+const ExtendedPoint = bandersnatch.ExtendedPoint;
+const ExtendedPointNormalized = bandersnatch.ExtendedPointNormalized;
 
 pub fn PrecompMSM(
     comptime _t: comptime_int,
@@ -21,25 +22,25 @@ pub fn PrecompMSM(
         const num_windows = (points_per_column * basis_len + b - 1) / b;
 
         allocator: Allocator,
-        table: []const ElementNormalized,
+        table: []const ExtendedPointNormalized,
 
         pub fn init(allocator: Allocator, basis: [basis_len]Element) !Self {
-            var table_basis = try allocator.alloc(Element, num_windows * basis_len);
+            var table_basis = try allocator.alloc(ExtendedPoint, num_windows * basis_len);
             defer allocator.free(table_basis);
             var idx: usize = 0;
             for (0..basis_len) |hi| {
-                table_basis[idx] = basis[hi];
+                table_basis[idx] = basis[hi].point;
                 idx += 1;
                 for (1..points_per_column) |_| {
                     table_basis[idx] = table_basis[idx - 1];
                     for (0..t) |_| {
-                        table_basis[idx].double(table_basis[idx]);
+                        table_basis[idx] = ExtendedPoint.double(table_basis[idx]);
                     }
                     idx += 1;
                 }
             }
 
-            var nn_table = try allocator.alloc(Element, window_size * num_windows);
+            var nn_table = try allocator.alloc(ExtendedPoint, window_size * num_windows);
             defer allocator.free(nn_table);
             for (0..num_windows) |w| {
                 const start = w * b;
@@ -48,14 +49,11 @@ pub fn PrecompMSM(
                     end = table_basis.len;
                 }
                 const window_basis = table_basis[start..end];
-                fill_window(window_basis, nn_table[w * window_size .. (w + 1) * window_size]);
+                fillWindow(window_basis, nn_table[w * window_size .. (w + 1) * window_size]);
             }
 
-            var table = try allocator.alloc(ElementNormalized, window_size * num_windows);
-            // TODO: batch.
-            for (nn_table, 0..) |p, i| {
-                table[i] = ElementNormalized.fromExtendedPoint(p.point);
-            }
+            var table = try allocator.alloc(ExtendedPointNormalized, window_size * num_windows);
+            try ExtendedPointNormalized.fromExtendedPoints(table, nn_table);
 
             return Self{
                 .allocator = allocator,
@@ -108,16 +106,16 @@ pub fn PrecompMSM(
             return Element{ .point = accum };
         }
 
-        fn fill_window(basis: []const Element, table: []Element) void {
+        fn fillWindow(basis: []const ExtendedPoint, table: []ExtendedPoint) void {
             if (basis.len == 0) {
                 for (0..table.len) |i| {
-                    table[i] = Element.identity();
+                    table[i] = ExtendedPoint.identity();
                 }
                 return;
             }
-            fill_window(basis[1..], table[0 .. table.len / 2]);
+            fillWindow(basis[1..], table[0 .. table.len / 2]);
             for (0..table.len / 2) |i| {
-                table[table.len / 2 + i].add(table[i], basis[0]);
+                table[table.len / 2 + i] = ExtendedPoint.add(table[i], basis[0]);
             }
         }
     };

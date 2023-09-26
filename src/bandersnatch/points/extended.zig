@@ -23,6 +23,33 @@ pub const ExtendedPointNormalized = struct {
             .t = Fp.mul(x, y),
         };
     }
+
+    pub fn fromExtendedPoints(result: []ExtendedPointNormalized, points: []const ExtendedPoint) !void {
+        var accumulator = Fp.one();
+
+        for (0..points.len) |i| {
+            result[i].x = accumulator;
+            accumulator = Fp.mul(accumulator, points[i].z);
+        }
+
+        var accInverse = accumulator.inv().?;
+
+        for (0..points.len) |i| {
+            result[result.len - 1 - i].x = Fp.mul(result[result.len - 1 - i].x, accInverse);
+            accInverse = Fp.mul(accInverse, points[points.len - 1 - i].z);
+        }
+
+        for (0..points.len) |i| {
+            const z_inv = result[i].x;
+            result[i].x = Fp.mul(points[i].x, z_inv);
+            result[i].y = Fp.mul(points[i].y, z_inv);
+            result[i].t = Fp.mul(result[i].x, result[i].y);
+        }
+    }
+
+    pub fn equal(self: ExtendedPointNormalized, other: ExtendedPointNormalized) bool {
+        return self.x.equal(other.x) and self.y.equal(other.y) and self.t.equal(other.t);
+    }
 };
 
 pub const ExtendedPoint = struct {

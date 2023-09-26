@@ -82,7 +82,7 @@ fn benchPedersenHash() !void {
     }
     var allocator = gpa.allocator();
 
-    var precomp_msm = try precomp.PrecompMSM(4, 6, crs.DomainSize).init(allocator, xcrs.Gs);
+    var precomp_msm = try precomp.PrecompMSM(2, 8, crs.DomainSize).init(allocator, xcrs.Gs);
     defer precomp_msm.deinit();
 
     var vec_len: usize = 1;
