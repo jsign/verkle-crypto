@@ -14,18 +14,17 @@ const IPA = ipa.IPA(crs.DomainSize);
 const LagrangeBasis = lagrange_basis.LagrangeBasis(crs.DomainSize, crs.Domain);
 const PrecomputedWeights = precomputed_weights.PrecomputedWeights(crs.DomainSize, crs.Domain);
 
-// TODO: We could store the polynomial once and just gather the queries for
-// that polynomial. This way is in-efficient, however it's easier to read
+// TODO: maybe group (potentially) multiple openings for the same poly?
 pub const ProverQuery = struct {
     f: LagrangeBasis,
     C: Element,
-    z: Fr,
+    z: u8,
     y: Fr,
 };
 
 pub const VerifierQuery = struct {
     C: Element,
-    z: Fr,
+    z: u8,
     y: Fr,
 };
 
@@ -55,7 +54,7 @@ pub const MultiProof = struct {
         // Add queries into transcript
         for (queries) |query| {
             transcript.appendPoint(query.C, "C");
-            transcript.appendScalar(query.z, "z");
+            transcript.appendScalar(Fr.fromInteger(@as(u256, query.z)), "z");
             transcript.appendScalar(query.y, "y");
         }
 
@@ -87,7 +86,7 @@ pub const MultiProof = struct {
 
         for (queries) |query| {
             const f = query.f;
-            const index = @as(u8, @intCast(query.z.toInteger()));
+            const index = query.z;
             const denominator_inv = Fr.sub(t, crs.Domain[index]).inv().?;
             for (0..crs.DomainSize) |i| {
                 h[i] = Fr.add(
@@ -134,6 +133,10 @@ pub const MultiProof = struct {
         queries: []const VerifierQuery,
         proof: Proof,
     ) !bool {
+        if (queries.len == 0) {
+            return error.QueriesCountIsZero;
+        }
+
         var arena = std.heap.ArenaAllocator.init(base_allocator);
         defer arena.deinit();
         var allocator = arena.allocator();
@@ -147,75 +150,105 @@ pub const MultiProof = struct {
             const z_i = query.z;
             const y_i = query.y;
             transcript.appendPoint(C_i, "C");
-            transcript.appendScalar(z_i, "z");
+            transcript.appendScalar(Fr.fromInteger(z_i), "z");
             transcript.appendScalar(y_i, "y");
         }
 
-        // Step 1
+        // Compute powers of r.
         const r = transcript.challengeScalar("r");
+        const powers_of_r = try powersOf(allocator, r, queries.len);
 
-        // Step 2
+        // Group by eval point.
+        var grouped_evals: [crs.DomainSize]Fr = grouped_evals: {
+            var ret: [crs.DomainSize]Fr = undefined;
+            for (0..crs.DomainSize) |i| {
+                ret[i] = Fr.zero();
+            }
+            for (0..queries.len) |i| {
+                const z = queries[i].z;
+                const numerator = Fr.mul(powers_of_r[i], queries[i].y);
+                ret[z] = Fr.add(ret[z], numerator);
+            }
+            break :grouped_evals ret;
+        };
+
         transcript.appendPoint(D, "D");
         const t = transcript.challengeScalar("t");
 
-        var g_2_of_t = Fr.zero();
-        var power_of_r = Fr.one();
+        // Compute helpers 1/(t-z_i).
+        const helper_scalar_den: [crs.DomainSize]Fr = helpers: {
+            var den: [crs.DomainSize]Fr = undefined;
+            for (0..crs.DomainSize) |z| {
+                den[z] = Fr.sub(t, Fr.fromInteger(z));
+            }
+            var invDen: [crs.DomainSize]Fr = undefined;
+            try Fr.batchInv(&invDen, &den);
 
+            break :helpers invDen;
+        };
+
+        // Compute g_2(t) = sum(grouped_evals / helpers)
+        var g_2_of_t = Fr.zero();
+        for (0..crs.DomainSize) |i| {
+            if (grouped_evals[i].isZero()) {
+                continue;
+            }
+            g_2_of_t = Fr.add(g_2_of_t, Fr.mul(grouped_evals[i], helper_scalar_den[i]));
+        }
+
+        // Compute E = sum(C_i * r^i/(t-z_i))
         var E_coefficients = try allocator.alloc(Fr, queries.len);
         var Cs = try allocator.alloc(Element, queries.len);
         for (queries, 0..) |query, i| {
             Cs[i] = query.C;
-            const z = @as(u8, @intCast(query.z.toInteger()));
-            const y = query.y;
-            E_coefficients[i] = Fr.mul(power_of_r, Fr.sub(t, crs.Domain[z]).inv().?);
-            g_2_of_t = Fr.add(g_2_of_t, Fr.mul(E_coefficients[i], y));
-
-            power_of_r = Fr.mul(power_of_r, r);
+            E_coefficients[i] = Fr.mul(powers_of_r[i], helper_scalar_den[queries[i].z]);
         }
-
         const E = banderwagon.msm(Cs, E_coefficients);
         transcript.appendPoint(E, "E");
 
-        // Step 3 (Check IPA proofs)
-        const y = g_2_of_t;
-        var ipa_commitment: Element = undefined;
-        ipa_commitment.sub(E, D);
-        const eval_point = t;
-        const output_point = y;
-        const input_point_vector = try self.precomp.barycentricFormulaConstants(eval_point);
+        // Check IPA proof.
+        var E_minus_D: Element = undefined;
+        E_minus_D.sub(E, D);
 
         const query = IPA.VerifierQuery{
-            .commitment = ipa_commitment,
-            .B = input_point_vector,
-            .eval_point = eval_point,
-            .result = output_point,
+            .commitment = E_minus_D,
+            .B = try self.precomp.barycentricFormulaConstants(t),
+            .eval_point = t,
+            .result = g_2_of_t,
             .proof = ipa_proof,
         };
         return IPA.verifyProof(self.crs, transcript, query);
     }
 
-    pub fn computeQuotientInsideDomain(self: MultiProof, f: LagrangeBasis, index: Fr) LagrangeBasis {
+    fn powersOf(allocator: Allocator, x: Fr, degree_minus_one: usize) ![]const Fr {
+        var res = try allocator.alloc(Fr, degree_minus_one);
+        res[0] = Fr.one();
+        for (1..degree_minus_one) |i| {
+            res[i] = Fr.mul(res[i - 1], x);
+        }
+        return res;
+    }
+
+    fn computeQuotientInsideDomain(self: MultiProof, f: LagrangeBasis, index: u8) LagrangeBasis {
         const inverses = self.precomp.domain_inverses;
         const Aprime_domain = self.precomp.Aprime_DOMAIN;
         const Aprime_domain_inv = self.precomp.Aprime_DOMAIN_inv;
 
-        const indexU256 = index.toInteger();
-        std.debug.assert(indexU256 < crs.DomainSize);
-        const indexInt = @as(isize, @intCast(indexU256));
+        const indexIsize = @as(isize, index);
 
         var q = [_]Fr{Fr.zero()} ** crs.DomainSize;
-        const y = f.evaluations[@as(usize, @intCast(indexInt))];
+        const y = f.evaluations[@as(usize, @intCast(indexIsize))];
         for (0..crs.DomainSize) |i| {
-            if (i != indexInt) {
+            if (i != indexIsize) {
                 const den = @as(isize, @intCast(inverses.len));
-                var num = @as(isize, @intCast(i)) - indexInt;
+                var num = @as(isize, @intCast(i)) - indexIsize;
                 var inv_idx = @mod(num, den);
                 q[i] = Fr.mul(Fr.sub(f.evaluations[i], y), inverses[@as(usize, @intCast(inv_idx))]);
 
                 inv_idx = @mod(-inv_idx, den);
-                q[@as(u8, @intCast(indexInt))] = Fr.add(
-                    q[@as(u8, @intCast(indexInt))],
-                    Fr.mul(Fr.mul(Fr.mul(Fr.sub(f.evaluations[i], y), inverses[@as(usize, @intCast(inv_idx))]), Aprime_domain[@as(u8, @intCast(indexInt))]), Aprime_domain_inv[i]),
+                q[@as(u8, @intCast(indexIsize))] = Fr.add(
+                    q[@as(u8, @intCast(indexIsize))],
+                    Fr.mul(Fr.mul(Fr.mul(Fr.sub(f.evaluations[i], y), inverses[@as(usize, @intCast(inv_idx))]), Aprime_domain[@as(u8, @intCast(indexIsize))]), Aprime_domain_inv[i]),
                 );
             }
         }
@@ -300,7 +333,7 @@ test "basic" {
     const vkt_crs = CRS.init();
     const C_a = CRS.commit(vkt_crs, poly_eval_a);
     const C_b = CRS.commit(vkt_crs, poly_eval_b);
-    const zs = [_]Fr{ Fr.zero(), Fr.zero() };
+    const zs = [_]u8{ 0, 0 };
     const ys = [_]Fr{ Fr.fromInteger(1), Fr.fromInteger(32) };
     const fs = [_][256]Fr{ poly_eval_a, poly_eval_b };
     const Cs = [_]Element{ C_a, C_b };
