@@ -8,7 +8,7 @@ const Transcript = @import("../ipa/transcript.zig");
 const ipa = @import("../ipa/ipa.zig");
 const crs = @import("../crs/crs.zig");
 const CRS = crs.CRS;
-const msm = @import("../msm/msm.zig");
+const msm = @import("../msm/precomp.zig");
 const precomputed_weights = @import("../polynomial/precomputed_weights.zig");
 
 const IPA = ipa.IPA(crs.DomainSize);

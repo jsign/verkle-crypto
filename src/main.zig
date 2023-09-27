@@ -16,7 +16,7 @@ test "crs" {
 }
 
 test "msm" {
-    _ = @import("msm/msm.zig");
+    _ = @import("msm/precomp.zig");
 }
 
 test "fields" {

@@ -2,7 +2,7 @@ const std = @import("std");
 const Allocator = std.mem.Allocator;
 const sha256 = std.crypto.hash.sha2.Sha256;
 const banderwagon = @import("../banderwagon/banderwagon.zig");
-const msm = @import("../msm/msm.zig");
+const msm = @import("../msm/precomp.zig");
 const Element = banderwagon.Element;
 const Fr = banderwagon.Fr;
 
