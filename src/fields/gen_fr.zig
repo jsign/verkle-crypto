@@ -17,6 +17,8 @@
 //   twos_complement_eval z = let x1 := z[0] + (z[1] << 64) + (z[2] << 128) + (z[3] << 192) in
 //                            if x1 & (2^256-1) < 2^255 then x1 & (2^256-1) else (x1 & (2^256-1)) - 2^256
 
+// This file contains further optimizations pulled from the Zig std.
+
 const std = @import("std");
 const mode = @import("builtin").mode; // Checked arithmetic is disabled in non-debug modes to avoid side channels
 
@@ -58,11 +60,10 @@ pub const NonMontgomeryDomainFieldElement = [4]u64;
 inline fn addcarryxU64(out1: *u64, out2: *u1, arg1: u1, arg2: u64, arg3: u64) void {
     @setRuntimeSafety(mode == .Debug);
 
-    const x1 = ((cast(u128, arg1) + cast(u128, arg2)) + cast(u128, arg3));
-    const x2 = cast(u64, (x1 & cast(u128, 0xffffffffffffffff)));
-    const x3 = cast(u1, (x1 >> 64));
-    out1.* = x2;
-    out2.* = x3;
+    const ov1 = @addWithOverflow(arg2, arg3);
+    const ov2 = @addWithOverflow(ov1[0], arg1);
+    out1.* = ov2[0];
+    out2.* = ov1[1] | ov2[1];
 }
 
 /// The function subborrowxU64 is a subtraction with borrow.
@@ -81,11 +82,10 @@ inline fn addcarryxU64(out1: *u64, out2: *u1, arg1: u1, arg2: u64, arg3: u64) vo
 inline fn subborrowxU64(out1: *u64, out2: *u1, arg1: u1, arg2: u64, arg3: u64) void {
     @setRuntimeSafety(mode == .Debug);
 
-    const x1 = ((cast(i128, arg2) - cast(i128, arg1)) - cast(i128, arg3));
-    const x2 = cast(i1, (x1 >> 64));
-    const x3 = cast(u64, (x1 & cast(i128, 0xffffffffffffffff)));
-    out1.* = x3;
-    out2.* = cast(u1, (cast(i2, 0x0) - cast(i2, x2)));
+    const ov1 = @subWithOverflow(arg2, arg3);
+    const ov2 = @subWithOverflow(ov1[0], arg1);
+    out1.* = ov2[0];
+    out2.* = ov1[1] | ov2[1];
 }
 
 /// The function mulxU64 is a multiplication, returning the full double-width result.
@@ -103,11 +103,9 @@ inline fn subborrowxU64(out1: *u64, out2: *u1, arg1: u1, arg2: u64, arg3: u64) v
 inline fn mulxU64(out1: *u64, out2: *u64, arg1: u64, arg2: u64) void {
     @setRuntimeSafety(mode == .Debug);
 
-    const x1 = (cast(u128, arg1) * cast(u128, arg2));
-    const x2 = cast(u64, (x1 & cast(u128, 0xffffffffffffffff)));
-    const x3 = cast(u64, (x1 >> 64));
-    out1.* = x2;
-    out2.* = x3;
+    const x = @as(u128, arg1) * @as(u128, arg2);
+    out1.* = @as(u64, @truncate(x));
+    out2.* = @as(u64, @truncate(x >> 64));
 }
 
 /// The function cmovznzU64 is a single-word conditional move.
@@ -124,10 +122,8 @@ inline fn mulxU64(out1: *u64, out2: *u64, arg1: u64, arg2: u64) void {
 inline fn cmovznzU64(out1: *u64, arg1: u1, arg2: u64, arg3: u64) void {
     @setRuntimeSafety(mode == .Debug);
 
-    const x1 = (~(~arg1));
-    const x2 = cast(u64, (cast(i128, cast(i1, (cast(i2, 0x0) - cast(i2, x1)))) & cast(i128, 0xffffffffffffffff)));
-    const x3 = ((x2 & arg3) | ((~x2) & arg2));
-    out1.* = x3;
+    const mask = 0 -% @as(u64, arg1);
+    out1.* = (mask & arg3) | ((~mask) & arg2);
 }
 
 /// The function mul multiplies two field elements in the Montgomery domain.
