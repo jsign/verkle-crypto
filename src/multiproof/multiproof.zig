@@ -204,7 +204,7 @@ pub const MultiProof = struct {
             Cs[i] = query.C;
             E_coefficients[i] = Fr.mul(powers_of_r[i], helper_scalar_den[queries[i].z]);
         }
-        var precomp = try msm.PrecompMSM(8, 8).init(allocator, Cs);
+        var precomp = try msm.PrecompMSM(253, 4).init(allocator, Cs);
         const E = try precomp.msm(E_coefficients);
         transcript.appendPoint(E, "E");
 

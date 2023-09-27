@@ -170,7 +170,7 @@ fn benchMultiproofs() !void {
 
     std.debug.print("Setting up multiproofs benchmark...\n", .{});
     const N = 25;
-    const openings = [_]u16{ 1, 10, 100, 1_000 };
+    const openings = [_]u16{ 1, 10, 100, 1_000, 2_000 };
 
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
     defer {

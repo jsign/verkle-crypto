@@ -135,62 +135,49 @@ pub fn IPA(comptime VectorLength: comptime_int) type {
             const w = transcript.challengeScalar("w");
             const q = xcrs.Q.scalarMul(w);
 
-            var current_commitment: Element = undefined;
-            current_commitment.add(C, q.scalarMul(y));
+            var commitment: Element = undefined;
+            commitment.add(C, q.scalarMul(y));
 
-            var xs: [NUM_STEPS]Fr = undefined;
-            var xinvs: [NUM_STEPS]Fr = undefined;
+            const challenges = generateChallenges(transcript, proof);
+            var challengesInv: [challenges.len]Fr = undefined;
+            try Fr.batchInv(&challengesInv, &challenges);
 
-            var step: usize = 0;
-            var n: usize = VectorLength;
-            while (n > 1) {
-                const m = n / 2;
-
-                const C_L = proof.L[step];
-                const C_R = proof.R[step];
-                transcript.appendPoint(C_L, "L");
-                transcript.appendPoint(C_R, "R");
-
-                const x = transcript.challengeScalar("x");
-                const x_inv = x.inv().?;
-
-                xs[step] = x;
-                xinvs[step] = x_inv;
-
+            for (0..challenges.len) |i| {
                 var tmp: Element = undefined;
-                tmp.add(Element.scalarMul(C_L, x), Element.scalarMul(C_R, x_inv));
-                current_commitment.add(current_commitment, tmp);
-
-                n = m;
-                step = step + 1;
+                tmp.add(Element.scalarMul(proof.L[i], challenges[i]), Element.scalarMul(proof.R[i], challengesInv[i]));
+                commitment.add(commitment, tmp);
             }
 
-            // Do it the inefficient way (TODO: optimize)
-            var _Gs = xcrs.Gs;
-            var current_basis: []Element = _Gs[0..];
+            var foldingScalars: [crs.DomainSize]Fr = undefined;
+            for (0..foldingScalars.len) |i| {
+                var scalar = Fr.one();
 
-            var b: []Fr = B[0..];
-            for (0..xs.len) |j| {
-                const current_basis_split = splitInHalf(Element, current_basis);
-                const b_split = splitInHalf(Fr, b);
-                const x_inv = xinvs[j];
-                foldScalars(b_split.L, b_split.R, x_inv);
-                b = b_split.L;
-                foldPoints(current_basis_split.L, current_basis_split.R, x_inv);
-                current_basis = current_basis_split.L;
+                inline for (0..challenges.len) |j| {
+                    if (i & (1 << (7 - j)) > 0) {
+                        scalar = Fr.mul(scalar, challengesInv[j]);
+                    }
+                }
+                foldingScalars[i] = scalar;
             }
+            const g0 = try xcrs.precomp.msm(&foldingScalars);
+            const b0 = innerProduct(&B, &foldingScalars);
 
-            assert(b.len == current_basis.len);
-            assert(b.len == 1);
+            const part1 = g0.scalarMul(proof.a);
+            const part2 = q.scalarMul(Fr.mul(b0, proof.a));
+            var got: Element = undefined;
+            got.add(part1, part2);
 
-            const b_0 = b[0];
-            const G_0 = current_basis[0];
+            return got.equal(commitment);
+        }
 
-            // G[0] * a + (a * b) * Q;
-            var got_commitment: Element = undefined;
-            got_commitment.add(Element.scalarMul(G_0, proof.a), Element.scalarMul(q, Fr.mul(proof.a, b_0)));
-
-            return current_commitment.equal(got_commitment);
+        fn generateChallenges(transcript: *Transcript, proof: IPAProof) [NUM_STEPS]Fr {
+            var challenges: [NUM_STEPS]Fr = undefined;
+            for (0..NUM_STEPS) |i| {
+                transcript.appendPoint(proof.L[i], "L");
+                transcript.appendPoint(proof.R[i], "R");
+                challenges[i] = transcript.challengeScalar("x");
+            }
+            return challenges;
         }
 
         // foldScalars computes a[i] = a[i] + b[i] * challenge
