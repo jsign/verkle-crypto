@@ -145,7 +145,8 @@ test "correctness" {
         scalars[i] = Fr.fromInteger((i + 0x93434) *% 0x424242);
     }
 
-    for (1..crs.DomainSize + 1) |msm_length| {
+    var msm_length: usize = 0;
+    while (msm_length <= crs.DomainSize) : (msm_length += 32) {
         const msm_scalars = scalars[0..msm_length];
 
         var full_scalars: [crs.DomainSize]Fr = undefined;
