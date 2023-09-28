@@ -8,7 +8,7 @@ const Transcript = @import("../ipa/transcript.zig");
 const ipa = @import("../ipa/ipa.zig");
 const crs = @import("../crs/crs.zig");
 const CRS = crs.CRS;
-const msm = @import("../msm/precomp.zig");
+const pippenger = @import("../msm/pippenger.zig");
 const precomputed_weights = @import("../polynomial/precomputed_weights.zig");
 
 const IPA = ipa.IPA(crs.DomainSize);
@@ -204,8 +204,7 @@ pub const MultiProof = struct {
             Cs[i] = query.C;
             E_coefficients[i] = Fr.mul(powers_of_r[i], helper_scalar_den[queries[i].z]);
         }
-        var precomp = try msm.PrecompMSM(253, 4).init(allocator, Cs);
-        const E = try precomp.msm(E_coefficients);
+        const E = try pippenger.Pippenger(8).msm(allocator, Cs, E_coefficients);
         transcript.appendPoint(E, "E");
 
         // Check IPA proof.

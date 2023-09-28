@@ -4,13 +4,13 @@ const banderwagon = @import("../banderwagon/banderwagon.zig");
 const Element = banderwagon.Element;
 const Fr = banderwagon.Fr;
 
-fn Pippenger(comptime c: comptime_int) type {
+pub fn Pippenger(comptime c: comptime_int) type {
     return struct {
         const window_mask = (1 << c) - 1;
         const num_windows = std.math.divCeil(u8, Fr.BitSize, c) catch unreachable;
         const num_buckets = (1 << c) - 1;
 
-        fn msm(base_allocator: Allocator, basis: []const Element, scalars_mont: []const Fr) !Element {
+        pub fn msm(base_allocator: Allocator, basis: []const Element, scalars_mont: []const Fr) !Element {
             std.debug.assert(basis.len >= scalars_mont.len);
 
             var arena = std.heap.ArenaAllocator.init(base_allocator);
