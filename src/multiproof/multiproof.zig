@@ -2,6 +2,7 @@ const std = @import("std");
 const Allocator = std.mem.Allocator;
 const banderwagon = @import("../banderwagon/banderwagon.zig");
 const Element = banderwagon.Element;
+const ElementNormalized = banderwagon.ElementNormalized;
 const Fr = banderwagon.Fr;
 const lagrange_basis = @import("../polynomial/lagrange_basis.zig");
 const Transcript = @import("../ipa/transcript.zig");
@@ -24,7 +25,7 @@ pub const ProverQuery = struct {
 };
 
 pub const VerifierQuery = struct {
-    C: Element,
+    C: ElementNormalized,
     z: u8,
     y: Fr,
 };
@@ -150,7 +151,7 @@ pub const MultiProof = struct {
             const C_i = query.C;
             const z_i = query.z;
             const y_i = query.y;
-            transcript.appendPoint(C_i, "C");
+            transcript.appendPointNormalized(C_i, "C");
             transcript.appendScalar(Fr.fromInteger(z_i), "z");
             transcript.appendScalar(y_i, "y");
         }
@@ -199,7 +200,7 @@ pub const MultiProof = struct {
 
         // Compute E = sum(C_i * r^i/(t-z_i))
         var E_coefficients = try allocator.alloc(Fr, queries.len);
-        var Cs = try allocator.alloc(Element, queries.len);
+        var Cs = try allocator.alloc(ElementNormalized, queries.len);
         for (queries, 0..) |query, i| {
             Cs[i] = query.C;
             E_coefficients[i] = Fr.mul(powers_of_r[i], helper_scalar_den[queries[i].z]);
@@ -366,8 +367,8 @@ test "basic" {
     );
 
     var verifier_transcript = Transcript.init("test");
-    var vquery_a = VerifierQuery{ .C = Cs[0], .z = zs[0], .y = ys[0] };
-    var vquery_b = VerifierQuery{ .C = Cs[1], .z = zs[1], .y = ys[1] };
+    var vquery_a = VerifierQuery{ .C = ElementNormalized.fromElement(Cs[0]), .z = zs[0], .y = ys[0] };
+    var vquery_b = VerifierQuery{ .C = ElementNormalized.fromElement(Cs[1]), .z = zs[1], .y = ys[1] };
     const ok = try multiproof.verifyProof(allocator, &verifier_transcript, &[_]VerifierQuery{ vquery_a, vquery_b }, proof);
 
     try std.testing.expect(ok);

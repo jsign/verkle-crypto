@@ -3,7 +3,7 @@ const Bandersnatch = @import("../bandersnatch/bandersnatch.zig");
 const Fp = Bandersnatch.Fp;
 const AffinePoint = Bandersnatch.AffinePoint;
 const ExtendedPoint = Bandersnatch.ExtendedPoint;
-const ArrayList = std.ArrayList;
+const ExtendedPointNormalized = Bandersnatch.ExtendedPointNormalized;
 
 // Fr is the scalar field of the Banderwgaon group, which matches with the
 // scalar field size of the Bandersnatch primer-ordered subgroup.
@@ -17,6 +17,12 @@ pub const Element = struct {
     // initUnsafe is used to create a Banderwagon from a serialized point from a trusted source.
     pub fn initUnsafe(bytes: [BytesSize]u8) Element {
         return Element{ .point = ExtendedPoint.initUnsafe(bytes) };
+    }
+
+    pub fn fromElementNormalized(e: ElementNormalized) Element {
+        return Element{
+            .point = ExtendedPoint.fromExtendedPointNormalized(e.point),
+        };
     }
 
     // fromBytes deserializes an element from a byte array.
@@ -62,6 +68,12 @@ pub const Element = struct {
     // add adds two elements of the Banderwagon group.
     pub fn add(self: *Element, p: Element, q: Element) void {
         self.point = ExtendedPoint.add(p.point, q.point);
+    }
+
+    pub fn mixedAdd(a: Element, b: ElementNormalized) Element {
+        return Element{
+            .point = ExtendedPoint.mixedAdd(a.point, b.point),
+        };
     }
 
     // sub subtracts two elements of the Banderwagon group.
@@ -134,10 +146,10 @@ pub const Element = struct {
 };
 
 // msm computes the multi-scalar multiplication of scalars and points.
+// TODO: change to Pippenger calls, and make everything use this.
 pub fn msm(points: []const Element, scalars: []const Fr) Element {
     std.debug.assert(scalars.len == points.len);
 
-    // TODO: optimize!
     var res = Element.identity();
     for (scalars, points) |scalar, point| {
         if (scalar.isZero()) {
@@ -202,4 +214,87 @@ test "two torsion" {
     result.add(gen, two_torsion);
 
     try std.testing.expect(result.equal(gen));
+}
+
+pub const ElementNormalized = struct {
+    point: ExtendedPointNormalized,
+
+    // fromBytes deserializes an element from a byte array.
+    // The spec serialization is the X coordinate in big endian form.
+    pub fn fromBytes(bytes: [Element.BytesSize]u8) !ElementNormalized {
+        var bytes_le = bytes;
+        std.mem.reverse(u8, &bytes_le);
+        const x = Fp.fromBytes(bytes_le); // TODO: reject if bytes are not canonical?
+
+        if (Element.subgroupCheck(x) != 1) {
+            return error.NotInSubgroup;
+        }
+        const y = try AffinePoint.getYCoordinate(x, true);
+
+        return ElementNormalized{ .point = ExtendedPointNormalized.initUnsafe(x, y) };
+    }
+
+    pub fn generator() ElementNormalized {
+        return ElementNormalized{ .point = ExtendedPointNormalized.generator() };
+    }
+
+    pub fn fromElement(p: Element) ElementNormalized {
+        return ElementNormalized{
+            .point = ExtendedPointNormalized.fromExtendedPoint(p.point),
+        };
+    }
+
+    pub fn equal(a: ElementNormalized, b: ElementNormalized) bool {
+        return ExtendedPointNormalized.equal(a.point, b.point);
+    }
+
+    pub fn toBytes(self: ElementNormalized) [Element.BytesSize]u8 {
+        return Element.fromElementNormalized(self).toBytes();
+    }
+
+    // TODO: move this.
+    pub fn fromElements(result: []ElementNormalized, points: []const Element) void {
+        var accumulator = Fp.one();
+
+        for (0..points.len) |i| {
+            result[i].point.x = accumulator;
+            accumulator = Fp.mul(accumulator, points[i].point.z);
+        }
+
+        var accInverse = accumulator.inv().?;
+
+        for (0..points.len) |i| {
+            result[result.len - 1 - i].point.x = Fp.mul(result[result.len - 1 - i].point.x, accInverse);
+            accInverse = Fp.mul(accInverse, points[points.len - 1 - i].point.z);
+        }
+
+        for (0..points.len) |i| {
+            const z_inv = result[i].point.x;
+            result[i].point.x = Fp.mul(points[i].point.x, z_inv);
+            result[i].point.y = Fp.mul(points[i].point.y, z_inv);
+            result[i].point.t = Fp.mul(result[i].point.x, result[i].point.y);
+        }
+    }
+};
+
+test "Element -> ElementNormalized" {
+    const g = Element.generator();
+    const scalars = [_]Fr{ Fr.fromInteger(3213), Fr.fromInteger(1212), Fr.fromInteger(4433) };
+
+    var points: [scalars.len]Element = undefined;
+    for (0..scalars.len) |i| {
+        points[i] = g.scalarMul(scalars[i]);
+    }
+
+    var expected: [scalars.len]ElementNormalized = undefined;
+    for (0..scalars.len) |i| {
+        expected[i] = ElementNormalized.fromElement(points[i]);
+    }
+
+    var got: [scalars.len]ElementNormalized = undefined;
+    ElementNormalized.fromElements(&got, &points);
+
+    for (0..expected.len) |i| {
+        try std.testing.expect(expected[i].equal(got[i]));
+    }
 }

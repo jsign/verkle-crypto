@@ -3,6 +3,7 @@ const sha256 = std.crypto.hash.sha2.Sha256;
 const banderwagon = @import("../banderwagon/banderwagon.zig");
 const Fr = banderwagon.Fr;
 const Element = banderwagon.Element;
+const ElementNormalized = banderwagon.ElementNormalized;
 
 state: sha256,
 
@@ -32,6 +33,11 @@ pub fn appendScalar(self: *Transcript, scalar: Fr, label: []const u8) void {
 }
 
 pub fn appendPoint(self: *Transcript, point: Element, label: []const u8) void {
+    const point_as_bytes = point.toBytes();
+    self.appendBytes(&point_as_bytes, label);
+}
+
+pub fn appendPointNormalized(self: *Transcript, point: ElementNormalized, label: []const u8) void {
     const point_as_bytes = point.toBytes();
     self.appendBytes(&point_as_bytes, label);
 }

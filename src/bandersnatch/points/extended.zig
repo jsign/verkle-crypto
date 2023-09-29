@@ -13,6 +13,18 @@ pub const ExtendedPointNormalized = struct {
         return comptime fromExtendedPoint(ExtendedPoint.identity());
     }
 
+    pub fn generator() ExtendedPointNormalized {
+        return comptime fromExtendedPoint(ExtendedPoint.generator());
+    }
+
+    pub fn initUnsafe(x: Fp, y: Fp) ExtendedPointNormalized {
+        return ExtendedPointNormalized{
+            .x = x,
+            .y = y,
+            .t = x.mul(y),
+        };
+    }
+
     pub fn fromExtendedPoint(p: ExtendedPoint) ExtendedPointNormalized {
         const z_inv = p.z.inv().?;
         const x = p.x.mul(z_inv);
@@ -22,29 +34,6 @@ pub const ExtendedPointNormalized = struct {
             .y = y,
             .t = Fp.mul(x, y),
         };
-    }
-
-    pub fn fromExtendedPoints(result: []ExtendedPointNormalized, points: []const ExtendedPoint) !void {
-        var accumulator = Fp.one();
-
-        for (0..points.len) |i| {
-            result[i].x = accumulator;
-            accumulator = Fp.mul(accumulator, points[i].z);
-        }
-
-        var accInverse = accumulator.inv().?;
-
-        for (0..points.len) |i| {
-            result[result.len - 1 - i].x = Fp.mul(result[result.len - 1 - i].x, accInverse);
-            accInverse = Fp.mul(accInverse, points[points.len - 1 - i].z);
-        }
-
-        for (0..points.len) |i| {
-            const z_inv = result[i].x;
-            result[i].x = Fp.mul(points[i].x, z_inv);
-            result[i].y = Fp.mul(points[i].y, z_inv);
-            result[i].t = Fp.mul(result[i].x, result[i].y);
-        }
     }
 
     pub fn equal(self: ExtendedPointNormalized, other: ExtendedPointNormalized) bool {
@@ -70,6 +59,15 @@ pub const ExtendedPoint = struct {
             .x = x,
             .y = y,
             .t = x.mul(y),
+            .z = Fp.one(),
+        };
+    }
+
+    pub fn fromExtendedPointNormalized(e: ExtendedPointNormalized) ExtendedPoint {
+        return ExtendedPoint{
+            .x = e.x,
+            .y = e.y,
+            .t = e.t,
             .z = Fp.one(),
         };
     }
@@ -116,6 +114,7 @@ pub const ExtendedPoint = struct {
         return (p.x.mul(q.z).equal(p.z.mul(q.x))) and (p.y.mul(q.z).equal(q.y.mul(p.z)));
     }
 
+    // TODO: change api to result receiver.
     pub fn add(p: ExtendedPoint, q: ExtendedPoint) ExtendedPoint {
         // https://hyperelliptic.org/EFD/g1p/auto-twisted-extended.html#addition-add-2008-hwcd
         const a = Fp.mul(p.x, q.x);
@@ -222,8 +221,7 @@ pub const ExtendedPoint = struct {
         }
     }
 
-    // # Only used for testing purposes.
-    pub fn to_bytes(self: ExtendedPoint) [32]u8 {
+    pub fn toBytes(self: ExtendedPoint) [32]u8 {
         return self.toAffine().to_bytes();
     }
 };

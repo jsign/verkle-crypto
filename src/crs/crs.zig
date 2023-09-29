@@ -4,6 +4,7 @@ const sha256 = std.crypto.hash.sha2.Sha256;
 const banderwagon = @import("../banderwagon/banderwagon.zig");
 const msm = @import("../msm/precomp.zig");
 const Element = banderwagon.Element;
+const ElementNormalized = banderwagon.ElementNormalized;
 const Fr = banderwagon.Fr;
 
 // DomainSize is the size of the domain.
@@ -24,15 +25,15 @@ pub const Domain: [DomainSize]Fr = domain_elements: {
 pub const CRS = struct {
     const PrecompMSM = msm.PrecompMSM(2, 8);
 
-    Gs: [DomainSize]Element,
-    Q: Element,
+    Gs: [DomainSize]ElementNormalized,
+    Q: ElementNormalized,
     precomp: PrecompMSM,
 
     pub fn init(allocator: Allocator) !CRS {
         const points = deserialize_vkt_points();
         return CRS{
             .Gs = points,
-            .Q = Element.generator(),
+            .Q = ElementNormalized.generator(),
             .precomp = try PrecompMSM.init(allocator, &points),
         };
     }
@@ -46,16 +47,20 @@ pub const CRS = struct {
     }
 
     pub fn commitSlow(self: CRS, values: [DomainSize]Fr) Element {
-        return banderwagon.msm(&self.Gs, &values);
+        var gs: [DomainSize]Element = undefined;
+        for (0..DomainSize) |i| {
+            gs[i] = Element.fromElementNormalized(self.Gs[i]);
+        }
+        return banderwagon.msm(&gs, &values);
     }
 };
 
-fn deserialize_vkt_points() [DomainSize]Element {
-    var points: [vkt_crs_points.len]Element = undefined;
+fn deserialize_vkt_points() [DomainSize]ElementNormalized {
+    var points: [vkt_crs_points.len]ElementNormalized = undefined;
     for (vkt_crs_points, 0..) |serialized_point, i| {
         var g_be_bytes: [32]u8 = undefined;
         _ = std.fmt.hexToBytes(&g_be_bytes, serialized_point) catch unreachable;
-        points[i] = Element.fromBytes(g_be_bytes) catch unreachable;
+        points[i] = ElementNormalized.fromBytes(g_be_bytes) catch unreachable;
     }
     return points;
 }
@@ -85,7 +90,7 @@ test "crs is consistent" {
 test "Gs cannot contain the generator" {
     const crs = try CRS.init(std.testing.allocator);
     defer crs.deinit();
-    const generator = Element.generator();
+    const generator = ElementNormalized.generator();
     for (crs.Gs) |point| {
         try std.testing.expect(!generator.equal(point));
     }

@@ -2,6 +2,7 @@ const std = @import("std");
 const Allocator = std.mem.Allocator;
 const banderwagon = @import("../banderwagon/banderwagon.zig");
 const Element = banderwagon.Element;
+const ElementNormalized = banderwagon.ElementNormalized;
 const Fr = banderwagon.Fr;
 
 pub fn Pippenger(comptime c: comptime_int) type {
@@ -10,7 +11,7 @@ pub fn Pippenger(comptime c: comptime_int) type {
         const num_windows = std.math.divCeil(u8, Fr.BitSize, c) catch unreachable;
         const num_buckets = (1 << c) - 1;
 
-        pub fn msm(base_allocator: Allocator, basis: []const Element, scalars_mont: []const Fr) !Element {
+        pub fn msm(base_allocator: Allocator, basis: []const ElementNormalized, scalars_mont: []const Fr) !Element {
             std.debug.assert(basis.len >= scalars_mont.len);
 
             var arena = std.heap.ArenaAllocator.init(base_allocator);
@@ -41,10 +42,9 @@ pub fn Pippenger(comptime c: comptime_int) type {
                         continue;
                     }
                     if (buckets[scalar_windows[i] - 1] == null) {
-                        buckets[scalar_windows[i] - 1] = basis[i];
-                        continue;
+                        buckets[scalar_windows[i] - 1] = Element.identity();
                     }
-                    buckets[scalar_windows[i] - 1].?.add(buckets[scalar_windows[i] - 1].?, basis[i]);
+                    buckets[scalar_windows[i] - 1] = Element.mixedAdd(buckets[scalar_windows[i] - 1].?, basis[i]);
                 }
 
                 // Aggregate buckets.
@@ -59,7 +59,9 @@ pub fn Pippenger(comptime c: comptime_int) type {
                         sum = buckets[buckets.len - 1 - i];
                         continue;
                     }
-                    sum.?.add(sum.?, buckets[buckets.len - 1 - i] orelse Element.identity());
+                    if (buckets[buckets.len - 1 - i] != null) {
+                        sum.?.add(sum.?, buckets[buckets.len - 1 - i].?);
+                    }
                     window_aggr.?.add(window_aggr.?, sum.?);
                 }
 

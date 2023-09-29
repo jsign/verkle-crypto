@@ -50,7 +50,7 @@ test "neg" {
 
 test "serialize gen" {
     const gen = ExtendedPoint.generator();
-    const serialised_point = gen.to_bytes();
+    const serialised_point = gen.toBytes();
 
     // test vector taken from the rust code (see spec reference)
     const expected = "18ae52a26618e7e1658499ad22c0792bf342be7b77113774c5340b2ccc32c129";
@@ -78,7 +78,7 @@ test "scalar mul minus one" {
     const result = gen.scalarMul(scalar);
 
     const expected = "e951ad5d98e7181e99d76452e0e343281295e38d90c602bf824892fd86742c4a";
-    const actual = std.fmt.bytesToHex(result.to_bytes(), std.fmt.Case.lower);
+    const actual = std.fmt.bytesToHex(result.toBytes(), std.fmt.Case.lower);
     try std.testing.expectEqualSlices(u8, expected, &actual);
 }
 
@@ -192,26 +192,4 @@ test "batch inv with error" {
     var got_invs: [fes.len]Fp = undefined;
     const out = Fp.batchInv(&got_invs, &fes);
     try std.testing.expectError(error.CantInvertZeroElement, out);
-}
-
-test "ExtendedPoint -> ExtendedPointNormalized" {
-    const g = ExtendedPoint.generator();
-    const scalars = [_]Fr{ Fr.fromInteger(3213), Fr.fromInteger(1212), Fr.fromInteger(4433) };
-
-    var points: [scalars.len]ExtendedPoint = undefined;
-    for (0..scalars.len) |i| {
-        points[i] = g.scalarMul(scalars[i]);
-    }
-
-    var expected: [scalars.len]ExtendedPointNormalized = undefined;
-    for (0..scalars.len) |i| {
-        expected[i] = ExtendedPointNormalized.fromExtendedPoint(points[i]);
-    }
-
-    var got: [scalars.len]ExtendedPointNormalized = undefined;
-    try ExtendedPointNormalized.fromExtendedPoints(&got, &points);
-
-    for (0..expected.len) |i| {
-        try std.testing.expect(expected[i].equal(got[i]));
-    }
 }

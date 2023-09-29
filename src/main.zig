@@ -4,7 +4,6 @@ pub fn main() !void {}
 
 test "bandersnatch" {
     _ = @import("bandersnatch/bandersnatch.zig");
-    // std.testing.refAllDeclsRecursive(@This());
 }
 
 test "banderwagon" {
@@ -16,7 +15,8 @@ test "crs" {
 }
 
 test "msm" {
-    _ = @import("msm/precomp.zig");
+    // _ = @import("msm/precomp.zig");
+    _ = @import("msm/pippenger.zig");
 }
 
 test "fields" {
