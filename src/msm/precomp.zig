@@ -5,6 +5,10 @@ const Element = banderwagon.Element;
 const ElementNormalized = banderwagon.ElementNormalized;
 const Fr = banderwagon.Fr;
 
+// This implementation is based on:
+// Faster Montgomery multiplication andMulti-Scalar-Multiplication for SNARKs
+// https://tches.iacr.org/index.php/TCHES/article/view/10972/10279
+// plus some extra tricks from Ignacio Hagopian.
 pub fn PrecompMSM(
     comptime _t: comptime_int,
     comptime _b: comptime_int,

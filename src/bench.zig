@@ -201,7 +201,7 @@ fn benchMultiproofs() !void {
 
     const mproof = try multiproof.MultiProof.init(xcrs);
     for (openings) |num_openings| {
-        std.debug.print("\tBenchmarking {} openings...", .{num_openings});
+        std.debug.print("\tBenchmarking {} openings... ", .{num_openings});
 
         var accum_proving: i64 = 0;
         var accum_verifying: i64 = 0;

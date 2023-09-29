@@ -25,6 +25,14 @@ pub const ExtendedPointMSM = struct {
         };
     }
 
+    pub fn neg(p: ExtendedPointMSM) ExtendedPointMSM {
+        return ExtendedPointMSM{
+            .x = p.x.neg(),
+            .y = p.y,
+            .t = p.t.neg(),
+        };
+    }
+
     pub fn fromExtendedPoint(p: ExtendedPoint) ExtendedPointMSM {
         const z_inv = p.z.inv().?;
         const x = p.x.mul(z_inv);
@@ -73,12 +81,12 @@ pub const ExtendedPoint = struct {
         return comptime initUnsafe(gen.x, gen.y);
     }
 
-    pub fn neg(self: ExtendedPoint) ExtendedPoint {
+    pub fn neg(p: ExtendedPoint) ExtendedPoint {
         return ExtendedPoint{
-            .x = self.x.neg(),
-            .y = self.y,
-            .t = self.t.neg(),
-            .z = self.z,
+            .x = p.x.neg(),
+            .y = p.y,
+            .t = p.t.neg(),
+            .z = p.z,
         };
     }
 

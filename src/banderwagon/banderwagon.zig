@@ -216,6 +216,7 @@ test "two torsion" {
     try std.testing.expect(result.equal(gen));
 }
 
+// TODO: rename and reference methods too.
 pub const ElementNormalized = struct {
     point: ExtendedPointMSM,
 
@@ -250,6 +251,10 @@ pub const ElementNormalized = struct {
 
     pub fn toBytes(self: ElementNormalized) [Element.BytesSize]u8 {
         return Element.fromElementNormalized(self).toBytes();
+    }
+
+    pub fn neg(self: ElementNormalized) ElementNormalized {
+        return ElementNormalized{ .point = ExtendedPointMSM.neg(self.point) };
     }
 
     // TODO: move this.

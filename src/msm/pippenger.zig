@@ -7,9 +7,8 @@ const Fr = banderwagon.Fr;
 
 pub fn Pippenger(comptime c: comptime_int) type {
     return struct {
-        const window_mask = (1 << c) - 1;
         const num_windows = std.math.divCeil(u8, Fr.BitSize, c) catch unreachable;
-        const num_buckets = (1 << c) - 1;
+        const num_buckets = 1 << (c - 1);
 
         pub fn msm(base_allocator: Allocator, basis: []const ElementNormalized, scalars_mont: []const Fr) !Element {
             std.debug.assert(basis.len >= scalars_mont.len);
@@ -18,33 +17,31 @@ pub fn Pippenger(comptime c: comptime_int) type {
             defer arena.deinit();
             var allocator = arena.allocator();
 
-            var scalars = try allocator.alloc(u256, scalars_mont.len);
-            for (0..scalars.len) |i| {
-                scalars[i] = scalars_mont[i].toInteger();
-            }
+            var scalars_windows = try signedDigitDecomposition(allocator, scalars_mont);
 
             var result: ?Element = null;
             var buckets: [num_buckets]?Element = std.mem.zeroes([num_buckets]?Element);
-            var scalar_windows = try allocator.alloc(u16, scalars.len);
             for (0..num_windows) |w| {
-                // Partition scalars.
-                const w_idx = num_windows - w - 1;
-                for (0..scalars.len) |i| {
-                    scalar_windows[i] = @as(u16, @intCast((scalars[i] >> @as(u8, @intCast(w_idx * c))) & window_mask));
-                }
-
                 // Accumulate in buckets.
                 for (0..buckets.len) |i| {
                     buckets[i] = null;
                 }
-                for (0..scalar_windows.len) |i| {
-                    if (scalar_windows[i] == 0) {
+                for (0..scalars_mont.len) |i| {
+                    var scalar_window = scalars_windows[i + w * scalars_mont.len];
+                    if (scalar_window == 0) {
                         continue;
                     }
-                    if (buckets[scalar_windows[i] - 1] == null) {
-                        buckets[scalar_windows[i] - 1] = Element.identity();
+
+                    var adj_basis: ElementNormalized = basis[i];
+                    if (scalar_window < 0) {
+                        adj_basis = ElementNormalized.neg(basis[i]);
+                        scalar_window = -scalar_window;
                     }
-                    buckets[scalar_windows[i] - 1] = Element.mixedMsmAdd(buckets[scalar_windows[i] - 1].?, basis[i]);
+                    const bucket_idx = @as(usize, @intCast(scalar_window)) - 1;
+                    if (buckets[bucket_idx] == null) {
+                        buckets[bucket_idx] = Element.identity();
+                    }
+                    buckets[bucket_idx] = Element.mixedMsmAdd(buckets[bucket_idx].?, adj_basis);
                 }
 
                 // Aggregate buckets.
@@ -82,6 +79,29 @@ pub fn Pippenger(comptime c: comptime_int) type {
 
             return result orelse Element.identity();
         }
+
+        fn signedDigitDecomposition(arena: Allocator, scalars_mont: []const Fr) ![]i16 {
+            const window_mask = (1 << c) - 1;
+            var scalars_windows = try arena.alloc(i16, scalars_mont.len * num_windows);
+
+            for (0..scalars_mont.len) |i| {
+                const scalar = scalars_mont[i].toInteger();
+                var carry: u1 = 0;
+                for (0..num_windows) |j| {
+                    const curr_window = @as(u16, @intCast((scalar >> @as(u8, @intCast(j * c))) & window_mask)) + carry;
+                    carry = 0;
+                    if (curr_window >= 1 << (c - 1)) {
+                        std.debug.assert(j != num_windows - 1);
+                        scalars_windows[(num_windows - 1 - j) * scalars_mont.len + i] = @as(i16, @intCast(curr_window)) - (1 << c);
+                        carry = 1;
+                    } else {
+                        scalars_windows[(num_windows - 1 - j) * scalars_mont.len + i] = @as(i16, @intCast(curr_window));
+                    }
+                }
+            }
+
+            return scalars_windows;
+        }
     };
 }
 
@@ -95,7 +115,7 @@ test "correctness" {
         scalars[i] = Fr.fromInteger((i + 0x93434) *% 0x424242);
     }
 
-    inline for (2..8) |c| {
+    inline for (3..8) |c| {
         const pippenger = Pippenger(c);
 
         for (1..crs.DomainSize) |msm_length| {

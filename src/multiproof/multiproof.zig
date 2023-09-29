@@ -205,7 +205,8 @@ pub const MultiProof = struct {
             Cs[i] = query.C;
             E_coefficients[i] = Fr.mul(powers_of_r[i], helper_scalar_den[queries[i].z]);
         }
-        const E = try pippenger.Pippenger(8).msm(allocator, Cs, E_coefficients);
+        // TODO: make the window size be dynamically calculated.
+        const E = try pippenger.Pippenger(11).msm(allocator, Cs, E_coefficients);
         transcript.appendPoint(E, "E");
 
         // Check IPA proof.

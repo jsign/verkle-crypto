@@ -15,7 +15,7 @@ test "crs" {
 }
 
 test "msm" {
-    // _ = @import("msm/precomp.zig");
+    _ = @import("msm/precomp.zig");
     _ = @import("msm/pippenger.zig");
 }
 
