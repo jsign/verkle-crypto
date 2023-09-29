@@ -26,14 +26,14 @@ pub const CRS = struct {
     const PrecompMSM = msm.PrecompMSM(2, 8);
 
     Gs: [DomainSize]ElementNormalized,
-    Q: ElementNormalized,
+    Q: Element,
     precomp: PrecompMSM,
 
     pub fn init(allocator: Allocator) !CRS {
         const points = deserialize_vkt_points();
         return CRS{
             .Gs = points,
-            .Q = ElementNormalized.generator(),
+            .Q = Element.generator(),
             .precomp = try PrecompMSM.init(allocator, &points),
         };
     }

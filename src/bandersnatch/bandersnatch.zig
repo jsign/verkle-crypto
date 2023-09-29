@@ -1,6 +1,6 @@
 const std = @import("std");
 const BandersnatchFields = @import("../fields/fields.zig").BandersnatchFields;
-const extended_points = @import("points/extended.zig");
+const extendedpoints = @import("points/extended.zig");
 
 // Bandersnatch base and scalar finite fields.
 pub const Fp = BandersnatchFields.BaseField;
@@ -12,8 +12,8 @@ pub const D = Fp.fromInteger(138827208126141220649022263972958607803).div(Fp.fro
 
 // Points.
 pub const AffinePoint = @import("points/affine.zig");
-pub const ExtendedPoint = extended_points.ExtendedPoint;
-pub const ExtendedPointNormalized = extended_points.ExtendedPointNormalized;
+pub const ExtendedPoint = extendedpoints.ExtendedPoint;
+pub const ExtendedPointMSM = extendedpoints.ExtendedPointMSM;
 
 // Errors
 pub const CurveError = error{

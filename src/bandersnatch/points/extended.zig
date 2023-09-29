@@ -4,39 +4,35 @@ const Fp = Bandersnatch.Fp;
 const Fr = Bandersnatch.Fr;
 const AffinePoint = Bandersnatch.AffinePoint;
 
-pub const ExtendedPointNormalized = struct {
+pub const ExtendedPointMSM = struct {
     x: Fp,
     y: Fp,
     t: Fp,
 
-    pub fn identity() ExtendedPointNormalized {
+    pub fn identity() ExtendedPointMSM {
         return comptime fromExtendedPoint(ExtendedPoint.identity());
     }
 
-    pub fn generator() ExtendedPointNormalized {
+    pub fn generator() ExtendedPointMSM {
         return comptime fromExtendedPoint(ExtendedPoint.generator());
     }
 
-    pub fn initUnsafe(x: Fp, y: Fp) ExtendedPointNormalized {
-        return ExtendedPointNormalized{
+    pub fn initUnsafe(x: Fp, y: Fp) ExtendedPointMSM {
+        return ExtendedPointMSM{
             .x = x,
             .y = y,
-            .t = x.mul(y),
+            .t = x.mul(y).mul(Bandersnatch.D),
         };
     }
 
-    pub fn fromExtendedPoint(p: ExtendedPoint) ExtendedPointNormalized {
+    pub fn fromExtendedPoint(p: ExtendedPoint) ExtendedPointMSM {
         const z_inv = p.z.inv().?;
         const x = p.x.mul(z_inv);
         const y = p.y.mul(z_inv);
-        return ExtendedPointNormalized{
-            .x = x,
-            .y = y,
-            .t = Fp.mul(x, y),
-        };
+        return initUnsafe(x, y);
     }
 
-    pub fn equal(self: ExtendedPointNormalized, other: ExtendedPointNormalized) bool {
+    pub fn equal(self: ExtendedPointMSM, other: ExtendedPointMSM) bool {
         return self.x.equal(other.x) and self.y.equal(other.y) and self.t.equal(other.t);
     }
 };
@@ -63,13 +59,8 @@ pub const ExtendedPoint = struct {
         };
     }
 
-    pub fn fromExtendedPointNormalized(e: ExtendedPointNormalized) ExtendedPoint {
-        return ExtendedPoint{
-            .x = e.x,
-            .y = e.y,
-            .t = e.t,
-            .z = Fp.one(),
-        };
+    pub fn fromExtendedPointMSM(e: ExtendedPointMSM) ExtendedPoint {
+        return initUnsafe(e.x, e.y);
     }
 
     pub fn identity() ExtendedPoint {
@@ -134,12 +125,12 @@ pub const ExtendedPoint = struct {
         };
     }
 
-    pub fn mixedAdd(p: ExtendedPoint, q: ExtendedPointNormalized) ExtendedPoint {
+    pub fn mixedMsmAdd(p: ExtendedPoint, q: ExtendedPointMSM) ExtendedPoint {
         // https://hyperelliptic.org/EFD/g1p/auto-twisted-extended.html#addition-madd-2008-hwcd
         const A = Fp.mul(p.x, q.x);
         const B = Fp.mul(p.y, q.y);
-        const t0 = Fp.mul(Bandersnatch.D, q.t);
-        const C = Fp.mul(p.t, t0);
+        // const t0 = Fp.mul(Bandersnatch.D, q.t);
+        const C = Fp.mul(p.t, q.t);
         const D = p.z;
         const t1 = Fp.add(p.x, p.y);
         const t2 = Fp.add(q.x, q.y);

@@ -44,7 +44,7 @@ pub fn Pippenger(comptime c: comptime_int) type {
                     if (buckets[scalar_windows[i] - 1] == null) {
                         buckets[scalar_windows[i] - 1] = Element.identity();
                     }
-                    buckets[scalar_windows[i] - 1] = Element.mixedAdd(buckets[scalar_windows[i] - 1].?, basis[i]);
+                    buckets[scalar_windows[i] - 1] = Element.mixedMsmAdd(buckets[scalar_windows[i] - 1].?, basis[i]);
                 }
 
                 // Aggregate buckets.

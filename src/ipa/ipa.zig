@@ -62,7 +62,7 @@ pub fn IPA(comptime VectorLength: comptime_int) type {
 
             // Rescale Q.
             const w = transcript.challengeScalar("w");
-            const q = Element.fromElementNormalized(xcrs.Q).scalarMul(w);
+            const q = xcrs.Q.scalarMul(w);
 
             var L: [NUM_STEPS]Element = undefined;
             var R: [NUM_STEPS]Element = undefined;
@@ -137,7 +137,7 @@ pub fn IPA(comptime VectorLength: comptime_int) type {
             transcript.appendScalar(y, "output point");
 
             const w = transcript.challengeScalar("w");
-            const q = Element.fromElementNormalized(xcrs.Q).scalarMul(w);
+            const q = xcrs.Q.scalarMul(w);
 
             var commitment: Element = undefined;
             commitment.add(C, q.scalarMul(y));

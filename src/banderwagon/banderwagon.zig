@@ -3,7 +3,7 @@ const Bandersnatch = @import("../bandersnatch/bandersnatch.zig");
 const Fp = Bandersnatch.Fp;
 const AffinePoint = Bandersnatch.AffinePoint;
 const ExtendedPoint = Bandersnatch.ExtendedPoint;
-const ExtendedPointNormalized = Bandersnatch.ExtendedPointNormalized;
+const ExtendedPointMSM = Bandersnatch.ExtendedPointMSM;
 
 // Fr is the scalar field of the Banderwgaon group, which matches with the
 // scalar field size of the Bandersnatch primer-ordered subgroup.
@@ -21,7 +21,7 @@ pub const Element = struct {
 
     pub fn fromElementNormalized(e: ElementNormalized) Element {
         return Element{
-            .point = ExtendedPoint.fromExtendedPointNormalized(e.point),
+            .point = ExtendedPoint.fromExtendedPointMSM(e.point),
         };
     }
 
@@ -70,9 +70,9 @@ pub const Element = struct {
         self.point = ExtendedPoint.add(p.point, q.point);
     }
 
-    pub fn mixedAdd(a: Element, b: ElementNormalized) Element {
+    pub fn mixedMsmAdd(a: Element, b: ElementNormalized) Element {
         return Element{
-            .point = ExtendedPoint.mixedAdd(a.point, b.point),
+            .point = ExtendedPoint.mixedMsmAdd(a.point, b.point),
         };
     }
 
@@ -217,7 +217,7 @@ test "two torsion" {
 }
 
 pub const ElementNormalized = struct {
-    point: ExtendedPointNormalized,
+    point: ExtendedPointMSM,
 
     // fromBytes deserializes an element from a byte array.
     // The spec serialization is the X coordinate in big endian form.
@@ -231,21 +231,21 @@ pub const ElementNormalized = struct {
         }
         const y = try AffinePoint.getYCoordinate(x, true);
 
-        return ElementNormalized{ .point = ExtendedPointNormalized.initUnsafe(x, y) };
+        return ElementNormalized{ .point = ExtendedPointMSM.initUnsafe(x, y) };
     }
 
     pub fn generator() ElementNormalized {
-        return ElementNormalized{ .point = ExtendedPointNormalized.generator() };
+        return ElementNormalized{ .point = ExtendedPointMSM.generator() };
     }
 
     pub fn fromElement(p: Element) ElementNormalized {
         return ElementNormalized{
-            .point = ExtendedPointNormalized.fromExtendedPoint(p.point),
+            .point = ExtendedPointMSM.fromExtendedPoint(p.point),
         };
     }
 
     pub fn equal(a: ElementNormalized, b: ElementNormalized) bool {
-        return ExtendedPointNormalized.equal(a.point, b.point);
+        return ExtendedPointMSM.equal(a.point, b.point);
     }
 
     pub fn toBytes(self: ElementNormalized) [Element.BytesSize]u8 {
@@ -270,9 +270,9 @@ pub const ElementNormalized = struct {
 
         for (0..points.len) |i| {
             const z_inv = result[i].point.x;
-            result[i].point.x = Fp.mul(points[i].point.x, z_inv);
-            result[i].point.y = Fp.mul(points[i].point.y, z_inv);
-            result[i].point.t = Fp.mul(result[i].point.x, result[i].point.y);
+            const x = Fp.mul(points[i].point.x, z_inv);
+            const y = Fp.mul(points[i].point.y, z_inv);
+            result[i].point = ExtendedPointMSM.initUnsafe(x, y);
         }
     }
 };

@@ -98,7 +98,7 @@ pub fn PrecompMSM(
 
                         if (curr_window_b_idx == b) {
                             if (curr_window_scalar > 0) {
-                                accum = Element.mixedAdd(accum, self.table[curr_window_idx * window_size .. (curr_window_idx + 1) * window_size][curr_window_scalar]);
+                                accum = Element.mixedMsmAdd(accum, self.table[curr_window_idx * window_size .. (curr_window_idx + 1) * window_size][curr_window_scalar]);
                             }
                             curr_window_idx += 1;
 
@@ -108,7 +108,7 @@ pub fn PrecompMSM(
                     }
                 }
                 if (curr_window_scalar > 0) {
-                    accum = Element.mixedAdd(accum, self.table[curr_window_idx * window_size .. (curr_window_idx + 1) * window_size][curr_window_scalar]);
+                    accum = Element.mixedMsmAdd(accum, self.table[curr_window_idx * window_size .. (curr_window_idx + 1) * window_size][curr_window_scalar]);
                 }
             }
 
