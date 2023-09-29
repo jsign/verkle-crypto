@@ -92,6 +92,11 @@ pub const Element = struct {
         return bytes;
     }
 
+    pub fn normalize(self: *Element) void {
+        const affine = self.point.toAffine();
+        self.point = ExtendedPoint.initUnsafe(affine.x, affine.y);
+    }
+
     // double doubles an element of the Banderwagon group.
     pub fn double(self: *Element, p: Element) void {
         self.point = p.point.double();

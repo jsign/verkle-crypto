@@ -169,8 +169,8 @@ fn benchMultiproofs() !void {
     const LagrangeBasis = polynomials.LagrangeBasis(crs.DomainSize, crs.Domain);
 
     std.debug.print("Setting up multiproofs benchmark...\n", .{});
-    const N = 25;
-    const openings = [_]u16{ 1, 10, 100, 1_000, 2_000 };
+    const N = 1;
+    const openings = [_]u16{1000};
 
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
     defer {
@@ -233,6 +233,7 @@ fn benchMultiproofs() !void {
                     .z = vec_openings[i].z,
                     .y = vec_openings[i].poly_evaluations[vec_openings[i].z],
                 };
+                verifier_queries[i].C.normalize();
             }
             start = std.time.milliTimestamp();
             const ok = try mproof.verifyProof(allocator, &verifier_transcript, verifier_queries, proof);
