@@ -30,7 +30,7 @@ pub const Element = struct {
     pub fn fromBytes(bytes: [BytesSize]u8) !Element {
         var bytes_le = bytes;
         std.mem.reverse(u8, &bytes_le);
-        const x = Fp.fromBytes(bytes_le); // TODO: reject if bytes are not canonical?
+        const x = Fp.fromBytes(bytes_le);
 
         if (subgroupCheck(x) != 1) {
             return error.NotInSubgroup;
@@ -223,9 +223,14 @@ pub const ElementNormalized = struct {
     // fromBytes deserializes an element from a byte array.
     // The spec serialization is the X coordinate in big endian form.
     pub fn fromBytes(bytes: [Element.BytesSize]u8) !ElementNormalized {
+        const bi = std.mem.readIntSlice(u256, &bytes, std.builtin.Endian.Big);
+        if (bi >= Fp.MODULO) {
+            return error.BytesNotCanonical;
+        }
+
         var bytes_le = bytes;
         std.mem.reverse(u8, &bytes_le);
-        const x = Fp.fromBytes(bytes_le); // TODO: reject if bytes are not canonical?
+        const x = Fp.fromBytes(bytes_le);
 
         if (Element.subgroupCheck(x) != 1) {
             return error.NotInSubgroup;
@@ -301,5 +306,20 @@ test "Element -> ElementNormalized" {
 
     for (0..expected.len) |i| {
         try std.testing.expect(expected[i].equal(got[i]));
+    }
+}
+
+test "bytes canonical" {
+    const max_value_fp = Fp.MODULO - 1;
+    var bytes: [Fp.BytesSize]u8 = undefined;
+    std.mem.writeInt(u256, &bytes, max_value_fp, std.builtin.Endian.Big);
+    // Must succeed.
+    _ = try ElementNormalized.fromBytes(bytes);
+
+    for (0..3) |i| {
+        const bigger_than_modulus = Fp.MODULO + i;
+        std.mem.writeInt(u256, &bytes, bigger_than_modulus, std.builtin.Endian.Big);
+        const must_error = ElementNormalized.fromBytes(bytes);
+        try std.testing.expectError(error.BytesNotCanonical, must_error);
     }
 }

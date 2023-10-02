@@ -97,8 +97,7 @@ pub fn scalarMul(point: AffinePoint, scalar: Fr) AffinePoint {
     return result;
 }
 
-// TODO
-pub fn to_bytes(self: AffinePoint) [32]u8 {
+pub fn toBytes(self: AffinePoint) [32]u8 {
     const mCompressedNegative = 0x80;
     const mCompressedPositive = 0x00;
 

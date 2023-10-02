@@ -221,6 +221,6 @@ pub const ExtendedPoint = struct {
     }
 
     pub fn toBytes(self: ExtendedPoint) [32]u8 {
-        return self.toAffine().to_bytes();
+        return self.toAffine().toBytes();
     }
 };
