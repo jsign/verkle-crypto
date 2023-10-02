@@ -19,7 +19,7 @@ pub const Element = struct {
         return Element{ .point = ExtendedPoint.initUnsafe(bytes) };
     }
 
-    pub fn fromElementNormalized(e: ElementNormalized) Element {
+    pub fn fromElementNormalized(e: ElementMSM) Element {
         return Element{
             .point = ExtendedPoint.fromExtendedPointMSM(e.point),
         };
@@ -70,7 +70,7 @@ pub const Element = struct {
         self.point = ExtendedPoint.add(p.point, q.point);
     }
 
-    pub fn mixedMsmAdd(a: Element, b: ElementNormalized) Element {
+    pub fn mixedMsmAdd(a: Element, b: ElementMSM) Element {
         return Element{
             .point = ExtendedPoint.mixedMsmAdd(a.point, b.point),
         };
@@ -81,7 +81,6 @@ pub const Element = struct {
         self.point = ExtendedPoint.sub(p.point, q.point);
     }
 
-    // TODO: tests.
     // mapToScalarField maps a Banderwagon point to the scalar field.
     pub fn mapToScalarField(self: Element) [Fr.BytesSize]u8 {
         const y_inv = self.point.y.inv().?;
@@ -216,13 +215,12 @@ test "two torsion" {
     try std.testing.expect(result.equal(gen));
 }
 
-// TODO: rename and reference methods too.
-pub const ElementNormalized = struct {
+pub const ElementMSM = struct {
     point: ExtendedPointMSM,
 
     // fromBytes deserializes an element from a byte array.
     // The spec serialization is the X coordinate in big endian form.
-    pub fn fromBytes(bytes: [Element.BytesSize]u8) !ElementNormalized {
+    pub fn fromBytes(bytes: [Element.BytesSize]u8) !ElementMSM {
         const bi = std.mem.readIntSlice(u256, &bytes, std.builtin.Endian.Big);
         if (bi >= Fp.MODULO) {
             return error.BytesNotCanonical;
@@ -237,33 +235,33 @@ pub const ElementNormalized = struct {
         }
         const y = try AffinePoint.getYCoordinate(x, true);
 
-        return ElementNormalized{ .point = ExtendedPointMSM.initUnsafe(x, y) };
+        return ElementMSM{ .point = ExtendedPointMSM.initUnsafe(x, y) };
     }
 
-    pub fn generator() ElementNormalized {
-        return ElementNormalized{ .point = ExtendedPointMSM.generator() };
+    pub fn generator() ElementMSM {
+        return ElementMSM{ .point = ExtendedPointMSM.generator() };
     }
 
-    pub fn fromElement(p: Element) ElementNormalized {
-        return ElementNormalized{
+    pub fn fromElement(p: Element) ElementMSM {
+        return ElementMSM{
             .point = ExtendedPointMSM.fromExtendedPoint(p.point),
         };
     }
 
-    pub fn equal(a: ElementNormalized, b: ElementNormalized) bool {
+    pub fn equal(a: ElementMSM, b: ElementMSM) bool {
         return ExtendedPointMSM.equal(a.point, b.point);
     }
 
-    pub fn toBytes(self: ElementNormalized) [Element.BytesSize]u8 {
+    pub fn toBytes(self: ElementMSM) [Element.BytesSize]u8 {
         return Element.fromElementNormalized(self).toBytes();
     }
 
-    pub fn neg(self: ElementNormalized) ElementNormalized {
-        return ElementNormalized{ .point = ExtendedPointMSM.neg(self.point) };
+    pub fn neg(self: ElementMSM) ElementMSM {
+        return ElementMSM{ .point = ExtendedPointMSM.neg(self.point) };
     }
 
     // TODO: move this.
-    pub fn fromElements(result: []ElementNormalized, points: []const Element) void {
+    pub fn fromElements(result: []ElementMSM, points: []const Element) void {
         var accumulator = Fp.one();
 
         for (0..points.len) |i| {
@@ -296,13 +294,13 @@ test "Element -> ElementNormalized" {
         points[i] = g.scalarMul(scalars[i]);
     }
 
-    var expected: [scalars.len]ElementNormalized = undefined;
+    var expected: [scalars.len]ElementMSM = undefined;
     for (0..scalars.len) |i| {
-        expected[i] = ElementNormalized.fromElement(points[i]);
+        expected[i] = ElementMSM.fromElement(points[i]);
     }
 
-    var got: [scalars.len]ElementNormalized = undefined;
-    ElementNormalized.fromElements(&got, &points);
+    var got: [scalars.len]ElementMSM = undefined;
+    ElementMSM.fromElements(&got, &points);
 
     for (0..expected.len) |i| {
         try std.testing.expect(expected[i].equal(got[i]));
@@ -314,12 +312,12 @@ test "bytes canonical" {
     var bytes: [Fp.BytesSize]u8 = undefined;
     std.mem.writeInt(u256, &bytes, max_value_fp, std.builtin.Endian.Big);
     // Must succeed.
-    _ = try ElementNormalized.fromBytes(bytes);
+    _ = try ElementMSM.fromBytes(bytes);
 
     for (0..3) |i| {
         const bigger_than_modulus = Fp.MODULO + i;
         std.mem.writeInt(u256, &bytes, bigger_than_modulus, std.builtin.Endian.Big);
-        const must_error = ElementNormalized.fromBytes(bytes);
+        const must_error = ElementMSM.fromBytes(bytes);
         try std.testing.expectError(error.BytesNotCanonical, must_error);
     }
 }

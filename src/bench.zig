@@ -229,7 +229,7 @@ fn benchMultiproofs() !void {
             defer allocator.free(verifier_queries);
             for (0..num_openings) |i| {
                 verifier_queries[i] = multiproof.VerifierQuery{
-                    .C = banderwagon.ElementNormalized.fromElement(vec_openings[i].C),
+                    .C = banderwagon.ElementMSM.fromElement(vec_openings[i].C),
                     .z = vec_openings[i].z,
                     .y = vec_openings[i].poly_evaluations[vec_openings[i].z],
                 };

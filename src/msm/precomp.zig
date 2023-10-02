@@ -2,7 +2,7 @@ const std = @import("std");
 const Allocator = std.mem.Allocator;
 const banderwagon = @import("../banderwagon/banderwagon.zig");
 const Element = banderwagon.Element;
-const ElementNormalized = banderwagon.ElementNormalized;
+const ElementNormalized = banderwagon.ElementMSM;
 const Fr = banderwagon.Fr;
 
 // This implementation is based on:

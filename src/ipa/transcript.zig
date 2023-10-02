@@ -3,7 +3,7 @@ const sha256 = std.crypto.hash.sha2.Sha256;
 const banderwagon = @import("../banderwagon/banderwagon.zig");
 const Fr = banderwagon.Fr;
 const Element = banderwagon.Element;
-const ElementNormalized = banderwagon.ElementNormalized;
+const ElementNormalized = banderwagon.ElementMSM;
 
 state: sha256,
 
