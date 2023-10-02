@@ -5,6 +5,51 @@ const Element = banderwagon.Element;
 const ElementMSM = banderwagon.ElementMSM;
 const Fr = banderwagon.Fr;
 
+pub fn HybridPrecompMSM(
+    comptime cutoff: comptime_int,
+    comptime _t1: comptime_int,
+    comptime _b1: comptime_int,
+    comptime _t2: comptime_int,
+    comptime _b2: comptime_int,
+) type {
+    return struct {
+        const Self = @This();
+
+        precomp1: PrecompMSM(_t1, _b1),
+        precomp2: PrecompMSM(_t2, _b2),
+
+        pub fn init(allocator: Allocator, basis: []const ElementMSM) !Self {
+            if (basis.len < cutoff) {
+                return error.BasisTooSmall;
+            }
+
+            const precomp1 = try PrecompMSM(_t1, _b1).init(allocator, basis[0..cutoff]);
+            const precomp2 = try PrecompMSM(_t2, _b2).init(allocator, basis[cutoff..]);
+
+            return Self{
+                .precomp1 = precomp1,
+                .precomp2 = precomp2,
+            };
+        }
+
+        pub fn deinit(self: *Self) void {
+            self.precomp1.deinit();
+            self.precomp2.deinit();
+        }
+
+        pub fn msm(self: Self, mont_scalars: []const Fr) !Element {
+            if (mont_scalars.len < cutoff) {
+                return self.precomp1.msm(mont_scalars);
+            }
+            const left = try self.precomp1.msm(mont_scalars[0..cutoff]);
+            const right = try self.precomp2.msm(mont_scalars[cutoff..]);
+            var res: Element = undefined;
+            res.add(left, right);
+            return res;
+        }
+    };
+}
+
 // This implementation is based on:
 // Faster Montgomery multiplication andMulti-Scalar-Multiplication for SNARKs
 // https://tches.iacr.org/index.php/TCHES/article/view/10972/10279
@@ -67,7 +112,7 @@ pub fn PrecompMSM(
             };
         }
 
-        pub fn deinit(self: Self) void {
+        pub fn deinit(self: *Self) void {
             self.allocator.free(self.table);
         }
 
@@ -136,10 +181,42 @@ pub fn PrecompMSM(
 
 test "correctness" {
     const crs = @import("../crs/crs.zig");
-    const xcrs = try crs.CRS.init(std.testing.allocator);
+    var xcrs = try crs.CRS.init(std.testing.allocator);
     defer xcrs.deinit();
 
-    const precomp = try PrecompMSM(2, 5).init(std.testing.allocator, &xcrs.Gs);
+    var precomp = try PrecompMSM(2, 5).init(std.testing.allocator, &xcrs.Gs);
+    defer precomp.deinit();
+
+    var scalars: [crs.DomainSize]Fr = undefined;
+    for (0..scalars.len) |i| {
+        scalars[i] = Fr.fromInteger((i + 0x93434) *% 0x424242);
+    }
+
+    var msm_length: usize = 0;
+    while (msm_length <= crs.DomainSize) : (msm_length += 32) {
+        const msm_scalars = scalars[0..msm_length];
+
+        var full_scalars: [crs.DomainSize]Fr = undefined;
+        for (0..full_scalars.len) |i| {
+            if (i < msm_length) {
+                full_scalars[i] = msm_scalars[i];
+                continue;
+            }
+            full_scalars[i] = Fr.zero();
+        }
+        const exp = xcrs.commitSlow(full_scalars);
+        const got = try precomp.msm(msm_scalars);
+
+        try std.testing.expect(Element.equal(exp, got));
+    }
+}
+
+test "hybrid" {
+    const crs = @import("../crs/crs.zig");
+    var xcrs = try crs.CRS.init(std.testing.allocator);
+    defer xcrs.deinit();
+
+    var precomp = try HybridPrecompMSM(5, 4, 16, 2, 5).init(std.testing.allocator, &xcrs.Gs);
     defer precomp.deinit();
 
     var scalars: [crs.DomainSize]Fr = undefined;

@@ -109,7 +109,7 @@ pub fn Pippenger(comptime c: comptime_int) type {
 
 test "correctness" {
     const crs = @import("../crs/crs.zig");
-    const xcrs = try crs.CRS.init(std.testing.allocator);
+    var xcrs = try crs.CRS.init(std.testing.allocator);
     defer xcrs.deinit();
 
     var scalars: [crs.DomainSize]Fr = undefined;

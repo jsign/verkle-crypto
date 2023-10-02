@@ -243,7 +243,7 @@ test "basic proof" {
     }
 
     // Commit to the polynomial in lagrange basis
-    const xcrs = try crs.CRS.init(std.testing.allocator);
+    var xcrs = try crs.CRS.init(std.testing.allocator);
     defer xcrs.deinit();
     const commitment = try xcrs.commit(&lagrange_poly);
 

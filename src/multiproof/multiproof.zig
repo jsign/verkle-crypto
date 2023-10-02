@@ -332,7 +332,7 @@ test "basic" {
         Fr.fromInteger(1),
     } ** 8;
 
-    const xcrs = try CRS.init(std.testing.allocator);
+    var xcrs = try CRS.init(std.testing.allocator);
     defer xcrs.deinit();
     const C_a = try CRS.commit(xcrs, &poly_eval_a);
     const C_b = try CRS.commit(xcrs, &poly_eval_b);

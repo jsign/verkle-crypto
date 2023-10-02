@@ -38,7 +38,7 @@ pub const CRS = struct {
         };
     }
 
-    pub fn deinit(self: CRS) void {
+    pub fn deinit(self: *CRS) void {
         self.precomp.deinit();
     }
 
@@ -66,7 +66,7 @@ fn deserialize_vkt_points() [DomainSize]ElementNormalized {
 }
 
 test "crs is consistent" {
-    const crs = try CRS.init(std.testing.allocator);
+    var crs = try CRS.init(std.testing.allocator);
     defer crs.deinit();
     try std.testing.expect(crs.Gs.len == vkt_crs_points.len);
 
@@ -88,7 +88,7 @@ test "crs is consistent" {
 }
 
 test "Gs cannot contain the generator" {
-    const crs = try CRS.init(std.testing.allocator);
+    var crs = try CRS.init(std.testing.allocator);
     defer crs.deinit();
     const generator = ElementNormalized.generator();
     for (crs.Gs) |point| {
