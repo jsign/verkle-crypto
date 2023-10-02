@@ -23,7 +23,7 @@ pub const Domain: [DomainSize]Fr = domain_elements: {
 
 // CRS contains the base pof points for Pedersen Commitments.
 pub const CRS = struct {
-    const PrecompMSM = msm.PrecompMSM(2, 8);
+    const PrecompMSM = msm.PrecompMSM(4, 8);
 
     Gs: [DomainSize]ElementNormalized,
     Q: Element,

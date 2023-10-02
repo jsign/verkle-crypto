@@ -8,12 +8,15 @@ const multiproof = @import("multiproof/multiproof.zig");
 const polynomials = @import("polynomial/lagrange_basis.zig");
 const ipa = @import("ipa/ipa.zig");
 const Transcript = @import("ipa/transcript.zig");
+const msm = @import("msm/precomp.zig");
 
 pub fn main() !void {
-    try benchFields();
-    try benchPedersenHash();
-    try benchIPAs();
-    try benchMultiproofs();
+    // try benchFields();
+    // try benchPedersenHash();
+    // try benchIPAs();
+    // try benchMultiproofs();
+
+    try analyzePedersenHashConfigs();
 }
 
 fn benchFields() !void {
@@ -262,4 +265,47 @@ fn genBaseFieldElements(comptime N: usize) [N]Fp {
         fps[i] = fe;
     }
     return fps;
+}
+
+fn analyzePedersenHashConfigs() !void {
+    std.debug.print("Precomputed Pedersen Hashing configuration analysis...\n", .{});
+    const N = 10_000;
+
+    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    defer {
+        const deinit_status = gpa.deinit();
+        if (deinit_status == .leak) std.testing.expect(false) catch @panic("memory leak");
+    }
+    var allocator = gpa.allocator();
+
+    var scalars: [crs.DomainSize]Fr = undefined;
+    for (0..scalars.len) |i| {
+        scalars[i] = Fr.fromInteger(i + 0x424242);
+    }
+
+    const xcrs = try crs.CRS.init(allocator);
+    defer xcrs.deinit();
+
+    const ts = .{ 2, 4, 8, 16, 32, 64, 128 };
+    const bs = .{ 2, 4, 6, 8 };
+
+    inline for (ts) |t| {
+        inline for (bs) |b| {
+            var precomp = try msm.PrecompMSM(t, b).init(allocator, &xcrs.Gs);
+            defer precomp.deinit();
+
+            const table_size = precomp.table.len * @sizeOf(banderwagon.ElementMSM) >> 20;
+            std.debug.print("{},{} ({}MiB): ", .{ t, b, table_size });
+
+            const vec_lens = .{ 1, 5, 8, 16, 32, 64, 128, 256 };
+            inline for (vec_lens) |vec_len| {
+                var start = std.time.microTimestamp();
+                for (0..N) |_| {
+                    _ = try precomp.msm(scalars[0..vec_len]);
+                }
+                std.debug.print("{}={}µs ", .{ vec_len, @divTrunc((std.time.microTimestamp() - start), (N)) });
+            }
+            std.debug.print("\n", .{});
+        }
+    }
 }

@@ -2,7 +2,7 @@ const std = @import("std");
 const Allocator = std.mem.Allocator;
 const banderwagon = @import("../banderwagon/banderwagon.zig");
 const Element = banderwagon.Element;
-const ElementNormalized = banderwagon.ElementMSM;
+const ElementMSM = banderwagon.ElementMSM;
 const Fr = banderwagon.Fr;
 
 // This implementation is based on:
@@ -22,12 +22,12 @@ pub fn PrecompMSM(
         const points_per_column = (Fr.BitSize + t - 1) / t;
 
         allocator: Allocator,
-        table: []const ElementNormalized,
+        table: []const ElementMSM,
 
         num_windows: usize,
         basis_len: usize,
 
-        pub fn init(allocator: Allocator, basis: []const ElementNormalized) !Self {
+        pub fn init(allocator: Allocator, basis: []const ElementMSM) !Self {
             const num_windows = (points_per_column * basis.len + b - 1) / b;
             var table_basis = try allocator.alloc(Element, points_per_column * basis.len);
             defer allocator.free(table_basis);
@@ -56,8 +56,8 @@ pub fn PrecompMSM(
                 fillWindow(window_basis, nn_table[w * window_size .. (w + 1) * window_size]);
             }
 
-            var table = try allocator.alloc(ElementNormalized, window_size * num_windows);
-            ElementNormalized.fromElements(table, nn_table);
+            var table = try allocator.alloc(ElementMSM, window_size * num_windows);
+            ElementMSM.fromElements(table, nn_table);
 
             return Self{
                 .allocator = allocator,

@@ -5,6 +5,8 @@ const Element = banderwagon.Element;
 const ElementNormalized = banderwagon.ElementMSM;
 const Fr = banderwagon.Fr;
 
+// This is an implementation of "Notes on MSMs with Precomputation" by Gottfried Herold.
+
 pub fn Pippenger(comptime c: comptime_int) type {
     return struct {
         const num_windows = std.math.divCeil(u8, Fr.BitSize, c) catch unreachable;

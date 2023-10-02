@@ -4,6 +4,8 @@ const Fp = Bandersnatch.Fp;
 const Fr = Bandersnatch.Fr;
 const AffinePoint = Bandersnatch.AffinePoint;
 
+// TODO: explore if it's worth changin the API style to use receivers for outputs.
+
 pub const ExtendedPointMSM = struct {
     x: Fp,
     y: Fp,
@@ -113,7 +115,6 @@ pub const ExtendedPoint = struct {
         return (p.x.mul(q.z).equal(p.z.mul(q.x))) and (p.y.mul(q.z).equal(q.y.mul(p.z)));
     }
 
-    // TODO: change api to result receiver.
     pub fn add(p: ExtendedPoint, q: ExtendedPoint) ExtendedPoint {
         // https://hyperelliptic.org/EFD/g1p/auto-twisted-extended.html#addition-add-2008-hwcd
         const a = Fp.mul(p.x, q.x);
