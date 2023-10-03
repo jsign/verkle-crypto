@@ -11,10 +11,10 @@ const Transcript = @import("ipa/transcript.zig");
 const msm = @import("msm/precomp.zig");
 
 pub fn main() !void {
-    // try benchFields();
-    // try benchPedersenHash();
-    // try benchIPAs();
-    // try benchMultiproofs();
+    try benchFields();
+    try benchPedersenHash();
+    try benchIPAs();
+    try benchMultiproofs();
 
     try analyzePedersenHashConfigs();
 }
@@ -83,7 +83,7 @@ fn benchPedersenHash() !void {
     }
     var allocator = gpa.allocator();
 
-    const xcrs = try crs.CRS.init(allocator);
+    var xcrs = try crs.CRS.init(allocator);
     defer xcrs.deinit();
 
     var vec_len: usize = 1;
@@ -120,7 +120,7 @@ fn benchIPAs() !void {
     }
     var allocator = gpa.allocator();
 
-    const xcrs = try crs.CRS.init(allocator);
+    var xcrs = try crs.CRS.init(allocator);
     defer xcrs.deinit();
     const VKTIPA = ipa.IPA(crs.DomainSize);
     const vktipa = try VKTIPA.init();
@@ -182,7 +182,7 @@ fn benchMultiproofs() !void {
     }
     var allocator = gpa.allocator();
 
-    const xcrs = try crs.CRS.init(allocator);
+    var xcrs = try crs.CRS.init(allocator);
     defer xcrs.deinit();
 
     const PolyOpeningSetup = struct {
@@ -268,9 +268,6 @@ fn genBaseFieldElements(comptime N: usize) [N]Fp {
 }
 
 fn analyzePedersenHashConfigs() !void {
-    std.debug.print("Precomputed Pedersen Hashing configuration analysis...\n", .{});
-    const N = 10_000;
-
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
     defer {
         const deinit_status = gpa.deinit();
@@ -278,34 +275,67 @@ fn analyzePedersenHashConfigs() !void {
     }
     var allocator = gpa.allocator();
 
+    const N = 1_000;
+
     var scalars: [crs.DomainSize]Fr = undefined;
     for (0..scalars.len) |i| {
         scalars[i] = Fr.fromInteger(i + 0x424242);
     }
 
-    const xcrs = try crs.CRS.init(allocator);
+    var xcrs = try crs.CRS.init(allocator);
     defer xcrs.deinit();
 
-    const ts = .{ 2, 4, 8, 16, 32, 64, 128 };
-    const bs = .{ 2, 4, 6, 8 };
+    {
+        std.debug.print("Precomputed Pedersen Hashing configuration analysis...\n", .{});
+        const ts = .{ 2, 3, 4, 6, 8 };
+        const bs = .{ 4, 6, 8, 10 };
 
-    inline for (ts) |t| {
-        inline for (bs) |b| {
-            var precomp = try msm.PrecompMSM(t, b).init(allocator, &xcrs.Gs);
-            defer precomp.deinit();
+        inline for (ts) |t| {
+            inline for (bs) |b| {
+                var precomp = try msm.PrecompMSM(t, b).init(allocator, &xcrs.Gs);
+                defer precomp.deinit();
 
-            const table_size = precomp.table.len * @sizeOf(banderwagon.ElementMSM) >> 20;
-            std.debug.print("{},{} ({}MiB): ", .{ t, b, table_size });
+                const table_size = precomp.table.len * @sizeOf(banderwagon.ElementMSM) >> 20;
+                std.debug.print("t={},b={} (precomp table size {}MiB): ", .{ t, b, table_size });
 
-            const vec_lens = .{ 1, 5, 8, 16, 32, 64, 128, 256 };
-            inline for (vec_lens) |vec_len| {
-                var start = std.time.microTimestamp();
-                for (0..N) |_| {
-                    _ = try precomp.msm(scalars[0..vec_len]);
+                const vec_lens = .{ 1, 5, 8, 16, 64, 128, 256 };
+                inline for (vec_lens) |vec_len| {
+                    var start = std.time.microTimestamp();
+                    for (0..N) |_| {
+                        _ = try precomp.msm(scalars[0..vec_len]);
+                    }
+                    std.debug.print("{}={}µs ", .{ vec_len, @divTrunc((std.time.microTimestamp() - start), (N)) });
                 }
-                std.debug.print("{}={}µs ", .{ vec_len, @divTrunc((std.time.microTimestamp() - start), (N)) });
+                std.debug.print("\n", .{});
             }
-            std.debug.print("\n", .{});
+        }
+    }
+
+    {
+        std.debug.print("\nHybrid precomputed Pedersen Hashing configuration analysis [cutoff=5, (t,b)+(4,8)]...\n", .{});
+        const cutoff = 5;
+        const ts = .{ 2, 4, 8 };
+        const bs = .{ 8, 10, 11, 12 };
+
+        inline for (ts) |t| {
+            inline for (bs) |b| {
+                var hybprecomp = try msm.HybridPrecompMSM(cutoff, t, b, 4, 8).init(allocator, &xcrs.Gs);
+                defer hybprecomp.deinit();
+
+                const table_size1 = hybprecomp.precomp1.table.len * @sizeOf(banderwagon.ElementMSM) >> 20;
+                const table_size2 = hybprecomp.precomp2.table.len * @sizeOf(banderwagon.ElementMSM) >> 20;
+                std.debug.print("{},{} ({}MiB ({}+{})): ", .{ t, b, table_size1 + table_size2, table_size1, table_size2 });
+
+                const vec_lens = .{ 5, 8, 16, 64, 128, 256 };
+                inline for (vec_lens) |vec_len| {
+                    var start = std.time.microTimestamp();
+                    for (0..N) |_| {
+                        _ = try hybprecomp.msm(scalars[0..vec_len]);
+                    }
+                    std.debug.print("{}={}µs ", .{ vec_len, @divTrunc((std.time.microTimestamp() - start), (N)) });
+                }
+                std.debug.print("\n", .{});
+            }
         }
     }
 }
