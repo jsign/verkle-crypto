@@ -70,6 +70,8 @@ fn benchFields() !void {
         fps[i % set_size] = Fp.add(fps[i % set_size], fps[(i + 1) % set_size]);
     }
     std.debug.print("takes {}ns\n", .{@divTrunc((std.time.nanoTimestamp() - startNano), (N))});
+
+    std.debug.print("\n", .{});
 }
 
 fn benchPedersenHash() !void {
@@ -107,6 +109,7 @@ fn benchPedersenHash() !void {
         }
         std.debug.print("takes {}µs\n", .{@divTrunc((std.time.microTimestamp() - start), (N))});
     }
+    std.debug.print("\n", .{});
 }
 
 fn benchIPAs() !void {
@@ -166,6 +169,7 @@ fn benchIPAs() !void {
             @divTrunc((accum_verifier), (N)),
         },
     );
+    std.debug.print("\n", .{});
 }
 
 fn benchMultiproofs() !void {
@@ -250,6 +254,7 @@ fn benchMultiproofs() !void {
             },
         );
     }
+    std.debug.print("\n", .{});
 }
 
 fn genBaseFieldElements(comptime N: usize) [N]Fp {
@@ -338,4 +343,5 @@ fn analyzePedersenHashConfigs() !void {
             }
         }
     }
+    std.debug.print("\n", .{});
 }
