@@ -145,7 +145,6 @@ pub const Element = struct {
 };
 
 // msm computes the multi-scalar multiplication of scalars and points.
-// TODO: change to Pippenger calls, and make everything use this.
 pub fn msm(points: []const Element, scalars: []const Fr) Element {
     std.debug.assert(scalars.len == points.len);
 
@@ -260,7 +259,6 @@ pub const ElementMSM = struct {
         return ElementMSM{ .point = ExtendedPointMSM.neg(self.point) };
     }
 
-    // TODO: move this.
     pub fn fromElements(result: []ElementMSM, points: []const Element) void {
         var accumulator = Fp.one();
 

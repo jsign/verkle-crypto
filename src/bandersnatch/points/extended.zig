@@ -4,7 +4,7 @@ const Fp = Bandersnatch.Fp;
 const Fr = Bandersnatch.Fr;
 const AffinePoint = Bandersnatch.AffinePoint;
 
-// TODO: explore if it's worth changin the API style to use receivers for outputs.
+// TODO: explore if it's worth changing the API style to use receivers for outputs.
 
 pub const ExtendedPointMSM = struct {
     x: Fp,

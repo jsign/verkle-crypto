@@ -231,12 +231,19 @@ fn benchMultiproofs() !void {
             accum_proving += std.time.milliTimestamp() - start;
 
             // Verifying.
+            var copied_cs = try allocator.alloc(banderwagon.Element, vec_openings.len);
+            defer allocator.free(copied_cs);
+            for (0..vec_openings.len) |i| copied_cs[i] = vec_openings[i].C;
+            var cs_msms = try allocator.alloc(banderwagon.ElementMSM, vec_openings.len);
+            defer allocator.free(cs_msms);
+            banderwagon.ElementMSM.fromElements(cs_msms, copied_cs);
+
             var verifier_transcript = Transcript.init("test");
             var verifier_queries = try allocator.alloc(multiproof.VerifierQuery, num_openings);
             defer allocator.free(verifier_queries);
             for (0..num_openings) |i| {
                 verifier_queries[i] = multiproof.VerifierQuery{
-                    .C = banderwagon.ElementMSM.fromElement(vec_openings[i].C),
+                    .C = cs_msms[i],
                     .z = vec_openings[i].z,
                     .y = vec_openings[i].poly_evaluations[vec_openings[i].z],
                 };
