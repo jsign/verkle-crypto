@@ -12,13 +12,13 @@ pub const BandersnatchFields = struct {
 
 fn Field(comptime F: type, comptime mod: u256) type {
     return struct {
-        pub const BitSize = 253; // TODO
-        pub const BytesSize = 32;
-        pub const MODULO = mod;
-        pub const Q_MIN_ONE_DIV_2 = (MODULO - 1) / 2;
+        pub const BitSize = @bitSizeOf(u256) - @clz(mod);
+        pub const BytesSize = @sizeOf(u256);
+        pub const Modulo = mod;
+        pub const QMinOneDiv2 = (Modulo - 1) / 2;
 
         const Self = @This();
-        const baseZero = val: {
+        const base_zero = val: {
             var bz: F.MontgomeryDomainFieldElement = undefined;
             F.fromBytes(&bz, [_]u8{0} ** BytesSize);
             break :val Self{ .fe = bz };
@@ -28,7 +28,7 @@ fn Field(comptime F: type, comptime mod: u256) type {
 
         pub fn fromInteger(num: u256) Self {
             var lbe: [BytesSize]u8 = [_]u8{0} ** BytesSize;
-            std.mem.writeInt(u256, lbe[0..], num % MODULO, std.builtin.Endian.Little);
+            std.mem.writeInt(u256, lbe[0..], num % Modulo, std.builtin.Endian.Little);
 
             var nonMont: F.NonMontgomeryDomainFieldElement = undefined;
             F.fromBytes(&nonMont, lbe);
@@ -39,7 +39,7 @@ fn Field(comptime F: type, comptime mod: u256) type {
         }
 
         pub fn zero() Self {
-            return baseZero;
+            return base_zero;
         }
 
         pub fn one() Self {
@@ -75,7 +75,7 @@ fn Field(comptime F: type, comptime mod: u256) type {
 
         pub fn lexographicallyLargest(self: Self) bool {
             const selfNonMont = self.toInteger();
-            return selfNonMont > Q_MIN_ONE_DIV_2;
+            return selfNonMont > QMinOneDiv2;
         }
 
         pub fn fromMontgomery(self: Self) F.NonMontgomeryDomainFieldElement {
@@ -111,12 +111,12 @@ fn Field(comptime F: type, comptime mod: u256) type {
 
         pub fn neg(self: Self) Self {
             var ret: F.MontgomeryDomainFieldElement = undefined;
-            F.sub(&ret, baseZero.fe, self.fe);
+            F.sub(&ret, base_zero.fe, self.fe);
             return Self{ .fe = ret };
         }
 
         pub fn isZero(self: Self) bool {
-            return self.equal(baseZero);
+            return self.equal(base_zero);
         }
 
         pub fn isOne(self: Self) bool {
@@ -165,7 +165,7 @@ fn Field(comptime F: type, comptime mod: u256) type {
         }
 
         pub fn inv(self: Self) ?Self {
-            var r: u256 = MODULO;
+            var r: u256 = Modulo;
             var t: i512 = 0;
 
             var newr: u256 = self.toInteger();
@@ -188,15 +188,15 @@ fn Field(comptime F: type, comptime mod: u256) type {
             }
 
             if (t < 0) {
-                t = t + MODULO;
+                t = t + Modulo;
             }
 
             return Self.fromInteger(@intCast(t));
         }
 
         pub fn div(self: Self, den: Self) !Self {
-            const denInv = den.inv() orelse return error.DivisionByZero;
-            return self.mul(denInv);
+            const den_inv = den.inv() orelse return error.DivisionByZero;
+            return self.mul(den_inv);
         }
 
         pub fn equal(self: Self, other: Self) bool {
@@ -218,13 +218,13 @@ fn Field(comptime F: type, comptime mod: u256) type {
                 return null;
             }
             var candidate: Self = undefined;
-            var rootOfUnity: Self = undefined;
-            fastsqrt.sqrtAlg_ComputeRelevantPowers(x, &candidate, &rootOfUnity);
-            if (!fastsqrt.invSqrtEqDyadic(&rootOfUnity)) {
+            var root_of_unity: Self = undefined;
+            fastsqrt.sqrtAlg_ComputeRelevantPowers(x, &candidate, &root_of_unity);
+            if (!fastsqrt.invSqrtEqDyadic(&root_of_unity)) {
                 return null;
             }
 
-            return mul(candidate, rootOfUnity);
+            return mul(candidate, root_of_unity);
         }
 
         pub fn legendre(a: Self) i2 {
@@ -234,10 +234,10 @@ fn Field(comptime F: type, comptime mod: u256) type {
             // a, then a|p = 0)
             // Returns 1 if a has a square root modulo
             // p, -1 otherwise.
-            const ls = a.pow((MODULO - 1) / 2);
+            const ls = a.pow((Modulo - 1) / 2);
 
-            const moduloMinusOne = comptime fromInteger(MODULO - 1);
-            if (ls.equal(moduloMinusOne)) {
+            const modulo_minus_one = comptime fromInteger(Modulo - 1);
+            if (ls.equal(modulo_minus_one)) {
                 return -1;
             } else if (ls.isZero()) {
                 return 0;

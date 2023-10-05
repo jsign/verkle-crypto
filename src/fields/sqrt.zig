@@ -26,7 +26,7 @@ const sqrtPrecomp_PrimitiveDyadicRoots: [BaseField2Adicity + 1]feType_SquareRoot
         ret[i] = Fp.square(ret[i - 1]);
     }
 
-    if (ret[BaseField2Adicity - 1].toInteger() != Fp.MODULO - 1) {
+    if (ret[BaseField2Adicity - 1].toInteger() != Fp.Modulo - 1) {
         @compileError("something is wrong with the dyadic roots of unity");
     }
 

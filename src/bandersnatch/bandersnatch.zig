@@ -7,7 +7,7 @@ pub const Fp = BandersnatchFields.BaseField;
 pub const Fr = BandersnatchFields.ScalarField;
 
 // Curve parameters.
-pub const A = Fp.fromInteger(Fp.MODULO - 5);
+pub const A = Fp.fromInteger(Fp.Modulo - 5);
 pub const D = Fp.fromInteger(138827208126141220649022263972958607803).div(Fp.fromInteger(171449701953573178309673572579671231137)) catch unreachable;
 
 // Points.
@@ -72,7 +72,7 @@ test "scalar mul smoke" {
 test "scalar mul minus one" {
     const gen = ExtendedPoint.generator();
 
-    const integer = Fr.MODULO - 1;
+    const integer = Fr.Modulo - 1;
 
     const scalar = Fr.fromInteger(integer);
     const result = gen.scalarMul(scalar);
@@ -98,14 +98,14 @@ test "zero" {
 
 test "lexographically largest" {
     try std.testing.expect(!Fp.fromInteger(0).lexographicallyLargest());
-    try std.testing.expect(!Fp.fromInteger(Fp.Q_MIN_ONE_DIV_2).lexographicallyLargest());
+    try std.testing.expect(!Fp.fromInteger(Fp.QMinOneDiv2).lexographicallyLargest());
 
-    try std.testing.expect(Fp.fromInteger(Fp.Q_MIN_ONE_DIV_2 + 1).lexographicallyLargest());
-    try std.testing.expect(Fp.fromInteger(Fp.MODULO - 1).lexographicallyLargest());
+    try std.testing.expect(Fp.fromInteger(Fp.QMinOneDiv2 + 1).lexographicallyLargest());
+    try std.testing.expect(Fp.fromInteger(Fp.Modulo - 1).lexographicallyLargest());
 }
 
 test "from and to bytes" {
-    const cases = [_]Fp{ Fp.fromInteger(0), Fp.fromInteger(1), Fp.fromInteger(Fp.Q_MIN_ONE_DIV_2), Fp.fromInteger(Fp.MODULO - 1) };
+    const cases = [_]Fp{ Fp.fromInteger(0), Fp.fromInteger(1), Fp.fromInteger(Fp.QMinOneDiv2), Fp.fromInteger(Fp.Modulo - 1) };
 
     for (cases) |fe| {
         const bytes = fe.toBytes();
@@ -124,12 +124,12 @@ test "to integer" {
 }
 
 test "add sub mul neg" {
-    const got = Fp.fromInteger(10).mul(Fp.fromInteger(20)).add(Fp.fromInteger(30)).sub(Fp.fromInteger(40)).add(Fp.fromInteger(Fp.MODULO));
+    const got = Fp.fromInteger(10).mul(Fp.fromInteger(20)).add(Fp.fromInteger(30)).sub(Fp.fromInteger(40)).add(Fp.fromInteger(Fp.Modulo));
     const want = Fp.fromInteger(190);
     try std.testing.expect(got.equal(want));
 
     const gotneg = got.neg();
-    const wantneg = Fp.fromInteger(Fp.MODULO - 190);
+    const wantneg = Fp.fromInteger(Fp.Modulo - 190);
     try std.testing.expect(gotneg.equal(wantneg));
 }
 
@@ -140,7 +140,7 @@ test "inv" {
         try std.testing.expect(T.fromInteger(0).inv() == null);
 
         const one = T.one();
-        const cases = [_]T{ T.fromInteger(2), T.fromInteger(42), T.fromInteger(T.MODULO - 1) };
+        const cases = [_]T{ T.fromInteger(2), T.fromInteger(42), T.fromInteger(T.Modulo - 1) };
         for (cases) |fe| {
             try std.testing.expect(fe.mul(fe.inv().?).equal(one));
         }

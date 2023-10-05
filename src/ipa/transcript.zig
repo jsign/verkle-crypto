@@ -139,7 +139,7 @@ test "test vector 2" {
 test "test vector 3" {
     // Test that domain separation is consistent across implementations
     var transcript = Transcript.init("simple_protocol");
-    const minus_one = Fr.fromInteger(Fr.MODULO - 1);
+    const minus_one = Fr.fromInteger(Fr.Modulo - 1);
     const one = Fr.one();
     transcript.appendScalar(minus_one, "-1");
     transcript.domainSep("separate me");

@@ -45,7 +45,7 @@ pub fn PrecomputedWeights(
             inverses[0] = Fr.zero();
             for (1..DomainSize) |d| {
                 inverses[d] = Fr.inv(Fr.fromInteger(d)) orelse Fr.zero();
-                inverses[inverses.len - d] = Fr.inv(Fr.fromInteger(Fr.MODULO - d)) orelse Fr.zero();
+                inverses[inverses.len - d] = Fr.inv(Fr.fromInteger(Fr.Modulo - d)) orelse Fr.zero();
             }
             return .{
                 .A = _A,
