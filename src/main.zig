@@ -1,4 +1,6 @@
 const std = @import("std");
+pub const banderwagon = @import("banderwagon/banderwagon.zig");
+pub const bandersnatch = @import("bandersnatch/bandersnatch.zig");
 
 pub fn main() !void {}
 
