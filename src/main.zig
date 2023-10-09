@@ -1,6 +1,9 @@
 const std = @import("std");
 pub const banderwagon = @import("banderwagon/banderwagon.zig");
 pub const bandersnatch = @import("bandersnatch/bandersnatch.zig");
+pub const crs = @import("crs/crs.zig");
+pub const ipa = @import("ipa/ipa.zig");
+pub const multiproof = @import("multiproof/multiproof.zig");
 
 pub fn main() !void {}
 
