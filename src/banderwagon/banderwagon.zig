@@ -82,7 +82,7 @@ pub const Element = struct {
     }
 
     // mapToScalarField maps a Banderwagon point to the scalar field.
-    pub fn mapToScalarField(self: Element) [Fr.BytesSize]u8 {
+    pub fn mapToScalarField(self: Element) Fr {
         const y_inv = self.point.y.inv().?;
         const base_bytes = Fp.mul(self.point.x, y_inv).toBytes();
 
