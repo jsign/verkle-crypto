@@ -5,7 +5,10 @@ const Element = banderwagon.Element;
 const ElementNormalized = banderwagon.ElementMSM;
 const Fr = banderwagon.Fr;
 
-// This is an implementation of "Notes on MSMs with Precomputation" by Gottfried Herold.
+// This implementation is based on:
+// Faster Montgomery multiplication andMulti-Scalar-Multiplication for SNARKs
+// https://tches.iacr.org/index.php/TCHES/article/view/10972/10279
+// plus some extra tricks from Ignacio Hagopian.
 
 const optimals: [3]struct { length: u64, value: u4 } = .{
     .{ .length = 10, .value = 4 },

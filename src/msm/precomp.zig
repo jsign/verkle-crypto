@@ -50,10 +50,7 @@ pub fn HybridPrecompMSM(
     };
 }
 
-// This implementation is based on:
-// Faster Montgomery multiplication andMulti-Scalar-Multiplication for SNARKs
-// https://tches.iacr.org/index.php/TCHES/article/view/10972/10279
-// plus some extra tricks from Ignacio Hagopian.
+// This is an implementation of "Notes on MSMs with Precomputation" by Gottfried Herold.
 pub fn PrecompMSM(
     comptime _t: comptime_int,
     comptime _b: comptime_int,
