@@ -118,7 +118,7 @@ pub const MultiProof = struct {
         const polynomial = h_minus_g;
         const eval_point = t;
 
-        var query = IPA.ProverQuery{
+        const query = IPA.ProverQuery{
             .commitment = ipa_commitment,
             .A = polynomial,
             .eval_point = eval_point,
@@ -242,7 +242,7 @@ pub const MultiProof = struct {
         for (0..crs.DomainSize) |i| {
             if (i != indexIsize) {
                 const den = @as(isize, @intCast(inverses.len));
-                var num = @as(isize, @intCast(i)) - indexIsize;
+                const num = @as(isize, @intCast(i)) - indexIsize;
                 var inv_idx = @mod(num, den);
                 q[i] = Fr.mul(Fr.sub(f.evaluations[i], y), inverses[@as(usize, @intCast(inv_idx))]);
 
@@ -259,7 +259,7 @@ pub const MultiProof = struct {
 };
 
 test "basic" {
-    var allocator = std.testing.allocator;
+    const allocator = std.testing.allocator;
 
     // Polynomials in lagrange basis
     const poly_eval_a = [_]Fr{
@@ -367,8 +367,8 @@ test "basic" {
     );
 
     var verifier_transcript = Transcript.init("test");
-    var vquery_a = VerifierQuery{ .C = ElementNormalized.fromElement(Cs[0]), .z = zs[0], .y = ys[0] };
-    var vquery_b = VerifierQuery{ .C = ElementNormalized.fromElement(Cs[1]), .z = zs[1], .y = ys[1] };
+    const vquery_a = VerifierQuery{ .C = ElementNormalized.fromElement(Cs[0]), .z = zs[0], .y = ys[0] };
+    const vquery_b = VerifierQuery{ .C = ElementNormalized.fromElement(Cs[1]), .z = zs[1], .y = ys[1] };
     const ok = try multiproof.verifyProof(allocator, &verifier_transcript, &[_]VerifierQuery{ vquery_a, vquery_b }, proof);
 
     try std.testing.expect(ok);

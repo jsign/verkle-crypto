@@ -259,13 +259,13 @@ test "basic proof" {
     const output_point_check_hex = std.fmt.bytesToHex(output_point_check.toBytes(), std.fmt.Case.lower);
     try std.testing.expectEqualStrings("4a353e70b03c89f161de002e8713beec0d740a5e20722fd5bd68b30540a33208", &output_point_check_hex);
 
-    var query = VKTIPA.ProverQuery{
+    const query = VKTIPA.ProverQuery{
         .commitment = commitment,
         .A = lagrange_poly,
         .eval_point = eval_point,
     };
 
-    var ipa_proof = try ipa.createProof(xcrs, &prover_transcript, query);
+    const ipa_proof = try ipa.createProof(xcrs, &prover_transcript, query);
 
     // Lets check the state of the transcript by squeezing out another challenge
     const p_challenge = prover_transcript.challengeScalar("state");

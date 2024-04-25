@@ -220,7 +220,7 @@ pub const ElementMSM = struct {
     // fromBytes deserializes an element from a byte array.
     // The spec serialization is the X coordinate in big endian form.
     pub fn fromBytes(bytes: [Element.BytesSize]u8) !ElementMSM {
-        const bi = std.mem.readIntSlice(u256, &bytes, std.builtin.Endian.Big);
+        const bi = std.mem.readInt(u256, &bytes, .big);
         if (bi >= Fp.Modulo) {
             return error.BytesNotCanonical;
         }
@@ -308,13 +308,13 @@ test "Element -> ElementNormalized" {
 test "bytes canonical" {
     const max_value_fp = Fp.Modulo - 1;
     var bytes: [Fp.BytesSize]u8 = undefined;
-    std.mem.writeInt(u256, &bytes, max_value_fp, std.builtin.Endian.Big);
+    std.mem.writeInt(u256, &bytes, max_value_fp, .big);
     // Must succeed.
     _ = try ElementMSM.fromBytes(bytes);
 
     for (0..3) |i| {
         const bigger_than_modulus = Fp.Modulo + i;
-        std.mem.writeInt(u256, &bytes, bigger_than_modulus, std.builtin.Endian.Big);
+        std.mem.writeInt(u256, &bytes, bigger_than_modulus, .big);
         const must_error = ElementMSM.fromBytes(bytes);
         try std.testing.expectError(error.BytesNotCanonical, must_error);
     }

@@ -5,7 +5,7 @@ pub fn build(b: *std.Build) !void {
     const optimize = b.standardOptimizeOption(.{});
 
     const verkle_crypto_module = b.createModule(.{
-        .source_file = .{ .path = "src/main.zig" },
+        .root_source_file = .{ .path = "src/main.zig" },
     });
     try b.modules.put(b.dupe("verkle-crypto"), verkle_crypto_module);
 
@@ -27,7 +27,7 @@ pub fn build(b: *std.Build) !void {
     // run_test.has_side_effects = true;
     test_step.dependOn(&run_test.step);
 
-    var bench = b.addExecutable(.{
+    const bench = b.addExecutable(.{
         .name = "bench",
         .root_source_file = .{ .path = "src/bench.zig" },
         .target = target,

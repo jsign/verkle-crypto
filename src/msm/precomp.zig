@@ -98,7 +98,7 @@ pub fn PrecompMSM(
                 fillWindow(window_basis, nn_table[w * window_size .. (w + 1) * window_size]);
             }
 
-            var table = try allocator.alloc(ElementMSM, window_size * num_windows);
+            const table = try allocator.alloc(ElementMSM, window_size * num_windows);
             ElementMSM.fromElements(table, nn_table);
 
             return Self{

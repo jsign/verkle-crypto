@@ -28,7 +28,7 @@ fn Field(comptime F: type, comptime mod: u256) type {
 
         pub fn fromInteger(num: u256) Self {
             var lbe: [BytesSize]u8 = [_]u8{0} ** BytesSize;
-            std.mem.writeInt(u256, lbe[0..], num % Modulo, std.builtin.Endian.Little);
+            std.mem.writeInt(u256, lbe[0..], num % Modulo, .little);
 
             var nonMont: F.NonMontgomeryDomainFieldElement = undefined;
             F.fromBytes(&nonMont, lbe);
@@ -54,7 +54,7 @@ fn Field(comptime F: type, comptime mod: u256) type {
         pub fn fromBytes(bytes: [BytesSize]u8) Self {
             var non_mont: F.NonMontgomeryDomainFieldElement = undefined;
             inline for (0..4) |i| {
-                non_mont[i] = std.mem.readIntSlice(u64, bytes[i * 8 .. (i + 1) * 8], std.builtin.Endian.Little);
+                non_mont[i] = std.mem.readInt(u64, bytes[i * 8 .. (i + 1) * 8], .little);
             }
             var ret: Self = undefined;
             F.toMontgomery(&ret.fe, non_mont);
@@ -67,7 +67,7 @@ fn Field(comptime F: type, comptime mod: u256) type {
             F.fromMontgomery(&non_mont, self.fe);
             var ret: [BytesSize]u8 = undefined;
             inline for (0..4) |i| {
-                std.mem.writeIntSlice(u64, ret[i * 8 .. (i + 1) * 8], non_mont[i], std.builtin.Endian.Little);
+                std.mem.writeInt(u64, ret[i * 8 .. (i + 1) * 8], non_mont[i], .little);
             }
 
             return ret;
@@ -210,7 +210,7 @@ fn Field(comptime F: type, comptime mod: u256) type {
             var bytes: [BytesSize]u8 = [_]u8{0} ** BytesSize;
             F.toBytes(&bytes, non_mont);
 
-            return std.mem.readInt(u256, &bytes, std.builtin.Endian.Little);
+            return std.mem.readInt(u256, &bytes, .little);
         }
 
         pub fn sqrt(x: Self) ?Self {

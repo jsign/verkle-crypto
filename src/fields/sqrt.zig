@@ -287,7 +287,7 @@ pub fn sqrtAlg_ComputeRelevantPowers(
 test "correctness" {
     for (0..1_000) |i| {
         // Take a random fp.
-        var a: Fp = Fp.fromInteger(i);
+        const a: Fp = Fp.fromInteger(i);
 
         const sqrt_fast = Fp.sqrt(a);
         if (sqrt_fast == null) {
