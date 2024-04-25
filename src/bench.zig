@@ -18,7 +18,7 @@ pub fn main() !void {
         const deinit_status = gpa.deinit();
         if (deinit_status == .leak) std.testing.expect(false) catch @panic("memory leak");
     }
-    var allocator = gpa.allocator();
+    const allocator = gpa.allocator();
 
     try benchFields();
     try benchPedersenHash(allocator);
@@ -106,7 +106,7 @@ fn benchPedersenHash(allocator: Allocator) !void {
             }
         }
 
-        var start = std.time.microTimestamp();
+        const start = std.time.microTimestamp();
         for (0..N) |i| {
             _ = try xcrs.commit(vecs[i][0..vec_len]);
         }
@@ -223,7 +223,7 @@ fn benchMultiproofs(allocator: Allocator) !void {
             var copied_cs = try allocator.alloc(banderwagon.Element, vec_openings.len);
             defer allocator.free(copied_cs);
             for (0..vec_openings.len) |i| copied_cs[i] = vec_openings[i].C;
-            var cs_msms = try allocator.alloc(banderwagon.ElementMSM, vec_openings.len);
+            const cs_msms = try allocator.alloc(banderwagon.ElementMSM, vec_openings.len);
             defer allocator.free(cs_msms);
             banderwagon.ElementMSM.fromElements(cs_msms, copied_cs);
 
@@ -294,7 +294,7 @@ fn analyzePedersenHashConfigs(allocator: Allocator) !void {
 
                 const vec_lens = .{ 1, 5, 8, 16, 64, 128, 256 };
                 inline for (vec_lens) |vec_len| {
-                    var start = std.time.microTimestamp();
+                    const start = std.time.microTimestamp();
                     for (0..N) |_| {
                         _ = try precomp.msm(scalars[0..vec_len]);
                     }
@@ -322,7 +322,7 @@ fn analyzePedersenHashConfigs(allocator: Allocator) !void {
 
                 const vec_lens = .{ 5, 8, 16, 64, 128, 256 };
                 inline for (vec_lens) |vec_len| {
-                    var start = std.time.microTimestamp();
+                    const start = std.time.microTimestamp();
                     for (0..N) |_| {
                         _ = try hybprecomp.msm(scalars[0..vec_len]);
                     }

@@ -40,7 +40,7 @@ pub fn msmWithWindowSize(base_allocator: Allocator, c: u4, basis: []const Elemen
     defer arena.deinit();
     var allocator = arena.allocator();
 
-    var scalars_windows = try signedDigitDecomposition(allocator, c, num_windows, scalars_mont);
+    const scalars_windows = try signedDigitDecomposition(allocator, c, num_windows, scalars_mont);
 
     var result: ?Element = null;
     var buckets = try allocator.alloc(?Element, num_buckets);
