@@ -5,20 +5,20 @@ pub fn build(b: *std.Build) !void {
     const optimize = b.standardOptimizeOption(.{});
 
     const verkle_crypto_module = b.createModule(.{
-        .root_source_file = .{ .path = "src/main.zig" },
+        .root_source_file = .{ .cwd_relative = "src/main.zig" },
     });
     try b.modules.put(b.dupe("verkle-crypto"), verkle_crypto_module);
 
     const lib = b.addStaticLibrary(.{
         .name = "verkle-crypto",
-        .root_source_file = .{ .path = "src/main.zig" },
+        .root_source_file = .{ .cwd_relative = "src/main.zig" },
         .target = target,
         .optimize = optimize,
     });
     b.installArtifact(lib);
 
     const main_tests = b.addTest(.{
-        .root_source_file = .{ .path = "src/main.zig" },
+        .root_source_file = .{ .cwd_relative = "src/main.zig" },
         .target = target,
         .optimize = optimize,
     });
@@ -29,7 +29,7 @@ pub fn build(b: *std.Build) !void {
 
     const bench = b.addExecutable(.{
         .name = "bench",
-        .root_source_file = .{ .path = "src/bench.zig" },
+        .root_source_file = .{ .cwd_relative = "src/bench.zig" },
         .target = target,
         .optimize = optimize,
     });
