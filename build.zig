@@ -4,10 +4,9 @@ pub fn build(b: *std.Build) !void {
     const target = b.standardTargetOptions(.{});
     const optimize = b.standardOptimizeOption(.{});
 
-    const verkle_crypto_module = b.createModule(.{
-        .root_source_file = .{ .cwd_relative = "src/main.zig" },
+    _ = b.addModule("verkle-crypto", .{
+        .root_source_file = b.path("src/main.zig"),
     });
-    try b.modules.put(b.dupe("verkle-crypto"), verkle_crypto_module);
 
     const lib = b.addStaticLibrary(.{
         .name = "verkle-crypto",
